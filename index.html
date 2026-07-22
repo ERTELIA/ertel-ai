@@ -192,18 +192,99 @@
 <div id="app"></div>
 
 <script>
+/* ============ PONTE PARA O BANCO DE DADOS (Neon via /api/storage) ============
+   Fora do Claude, window.storage não existe. Este bloco recria a mesma
+   assinatura (get/set/delete/list) usada em todo o app:
+   - shared=false (dado pessoal, ex: "lembrar login") -> fica no navegador (localStorage)
+   - shared=true  (dado da empresa, ex: produtos/retiradas) -> vai para a API -> Neon
+*/
+window.storage = {
+  async _readErr(r){
+    try{ const j = await r.json(); return j.error || r.statusText || ('HTTP '+r.status); }
+    catch(e){ return r.statusText || ('HTTP '+r.status); }
+  },
+  async get(key, shared){
+    if(!shared){
+      const v = localStorage.getItem(key);
+      if(v===null) throw new Error('not found');
+      return {key, value:v, shared:false};
+    }
+    const r = await fetch('/api/storage?key='+encodeURIComponent(key));
+    if(r.status===404) throw new Error('not found');
+    if(!r.ok) throw new Error(await this._readErr(r));
+    const data = await r.json();
+    return {key:data.key, value:data.value, shared:true};
+  },
+  async set(key, value, shared){
+    if(!shared){ localStorage.setItem(key, value); return {key, value, shared:false}; }
+    const r = await fetch('/api/storage', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key, value})
+    });
+    if(!r.ok) throw new Error(await this._readErr(r));
+    const data = await r.json();
+    return {key:data.key, value:data.value, shared:true};
+  },
+  async delete(key, shared){
+    if(!shared){ localStorage.removeItem(key); return {key, deleted:true, shared:false}; }
+    const r = await fetch('/api/storage?key='+encodeURIComponent(key), {method:'DELETE'});
+    if(!r.ok) throw new Error(await this._readErr(r));
+    return {key, deleted:true, shared:true};
+  },
+  async list(prefix, shared){
+    if(!shared){
+      const keys = Object.keys(localStorage).filter(k=>k.startsWith(prefix||''));
+      return {keys, prefix, shared:false};
+    }
+    const r = await fetch('/api/storage?prefix='+encodeURIComponent(prefix||''));
+    if(!r.ok) throw new Error(await this._readErr(r));
+    const data = await r.json();
+    return {keys:data.keys, prefix, shared:true};
+  }
+};
+
 /* ============ STORAGE HELPERS ============ */
 const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub' };
 
+let dbOffline = false;
+function showDbErrorBanner(msg){
+  dbOffline = true;
+  let b = document.getElementById('dbErrorBanner');
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'dbErrorBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#B33F3F;color:#fff;padding:10px 14px;font-size:12.5px;z-index:999;text-align:center;font-family:sans-serif;';
+    document.body.prepend(b);
+  }
+  b.textContent = '⚠️ Sem conexão com o banco de dados — os dados NÃO estão sendo salvos. Detalhe: ' + msg;
+}
+function clearDbErrorBanner(){
+  dbOffline = false;
+  const b = document.getElementById('dbErrorBanner');
+  if(b) b.remove();
+}
+
 async function loadAll(key, fallback){
   try{
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 6000));
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout ao contatar /api/storage')), 8000));
     const r = await Promise.race([window.storage.get(key, true), timeout]);
+    clearDbErrorBanner();
     return r && r.value ? JSON.parse(r.value) : fallback;
-  }catch(e){ return fallback; }
+  }catch(e){
+    if(String(e.message||e).includes('not found')){ clearDbErrorBanner(); }
+    else { showDbErrorBanner(String(e.message||e)); }
+    return fallback;
+  }
 }
 async function saveAll(key, value){
-  try{ await window.storage.set(key, JSON.stringify(value), true); }catch(e){ console.error('storage error', e); }
+  try{
+    await window.storage.set(key, JSON.stringify(value), true);
+    clearDbErrorBanner();
+  }catch(e){
+    console.error('storage error', e);
+    showDbErrorBanner(String(e.message||e));
+    toast('Erro ao salvar no banco — os dados não foram gravados. Veja o aviso no topo da tela.');
+  }
 }
 
 let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[] };
@@ -229,6 +310,14 @@ async function bootstrap(){
     DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
   }
+  try{
+    const savedId = localStorage.getItem('ertel:session');
+    if(savedId){
+      const u = DB.usuarios.find(x=>x.id===savedId && x.ativo!==false);
+      if(u){ currentUser = {id:u.id, nome:u.nome, perfil:u.perfil}; }
+      else { localStorage.removeItem('ertel:session'); }
+    }
+  }catch(e){}
   render();
 }
 function isMaster(){
@@ -289,7 +378,7 @@ function render(){
       <button data-v="mais"><span>${ICONS.more}</span>Mais</button>
     </div>
   `;
-  document.getElementById('logoutBtn').onclick = ()=>{ currentUser=null; moduloAtivo=null; render(); };
+  document.getElementById('logoutBtn').onclick = ()=>{ currentUser=null; moduloAtivo=null; try{localStorage.removeItem('ertel:session');}catch(e){} render(); };
   document.getElementById('trocarModuloBtn').onclick = (e)=>{ e.stopPropagation(); moduloAtivo=null; currentView='dashboard'; render(); };
   document.querySelectorAll('.nav button').forEach(b=>{
     b.onclick = ()=>{ currentView=b.dataset.v; render(); };
@@ -337,7 +426,7 @@ function attachModuloSelectorEvents(){
     el.onclick = ()=>{ moduloAtivo = el.dataset.mod; currentView='dashboard'; resetModuleUiState(); render(); };
   });
   const sairBtn = document.getElementById('sairModuloBtn');
-  if(sairBtn) sairBtn.onclick = ()=>{ currentUser=null; render(); };
+  if(sairBtn) sairBtn.onclick = ()=>{ currentUser=null; try{localStorage.removeItem('ertel:session');}catch(e){} render(); };
 }
 
 function renderView(){
@@ -412,6 +501,7 @@ async function attachLoginEvents(){
       else await window.storage.delete('ertel:lastLogin', false);
     }catch(e){}
     currentUser = {id:u.id, nome:u.nome, perfil:u.perfil};
+    try{ localStorage.setItem('ertel:session', u.id); }catch(e){}
     render();
   };
   const loginBtn = document.getElementById('loginBtn');
