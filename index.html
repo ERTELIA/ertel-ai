@@ -438,6 +438,15 @@ function renderView(){
   else if(currentView==='mais') { el.innerHTML = maisView(); attachMaisEvents(); attachCommonEvents(); return; }
   attachCommonEvents();
 }
+function codigoJaExisteEmOutroModulo(codigo, ignorarId){
+  const c = codigo.toLowerCase();
+  const emMro = DB.produtos.find(p=>p.codigo.toLowerCase()===c && p.id!==ignorarId);
+  const emLub = DB.produtosLub.find(p=>p.codigo.toLowerCase()===c && p.id!==ignorarId);
+  if(emMro) return {existe:true, modulo:'Estoque MRO', produto:emMro};
+  if(emLub) return {existe:true, modulo:'Sala de Lubrificantes', produto:emLub};
+  return {existe:false};
+}
+
 function getProdutosArr(){ return moduloAtivo==='lub' ? DB.produtosLub : DB.produtos; }
 function getRetiradasArr(){ return moduloAtivo==='lub' ? DB.retiradasLub : DB.retiradas; }
 function getProdutosKey(){ return moduloAtivo==='lub' ? KEYS.produtosLub : KEYS.produtos; }
@@ -794,6 +803,8 @@ function attachProdutosEvents(){
     const valorUnitario = parseFloat(document.getElementById('fValor').value)||0;
     const estoqueMinimo = parseFloat(document.getElementById('fMinimo').value)||0;
     if(!codigo || !descricao){ toast('Preencha código e descrição'); return; }
+    const dup = codigoJaExisteEmOutroModulo(codigo, editingProduto?editingProduto.id:null);
+    if(dup.existe){ toast(`Código já cadastrado em "${dup.modulo}" (${dup.produto.descricao}). Use outro código.`); return; }
     const foto = pendingFotoDataUrl || (editingProduto ? editingProduto.foto : '') || '';
     if(editingProduto){
       Object.assign(editingProduto, {codigo,descricao,endereco,unidade,quantidade,valorUnitario,estoqueMinimo,foto});
@@ -1077,7 +1088,6 @@ function maisView(){
   html += `<div class="tabs-wrap">
     <button class="btn ${maisTab==='centros'?'btn-primary':'btn-ghost'} btn-sm" id="tabCentros">Centros de Custo</button>
     <button class="btn ${maisTab==='usuarios'?'btn-primary':'btn-ghost'} btn-sm" id="tabUsuarios">Usuários</button>
-    <button class="btn ${maisTab==='credenciais'?'btn-primary':'btn-ghost'} btn-sm" id="tabCredenciais">Credenciais</button>
     <button class="btn ${maisTab==='inventario'?'btn-primary':'btn-ghost'} btn-sm" id="tabInventario">Inventário</button>
     <button class="btn ${maisTab==='alertas'?'btn-primary':'btn-ghost'} btn-sm" id="tabAlertas">Alertas de Recompra</button>
     <button class="btn ${maisTab==='indicadores'?'btn-primary':'btn-ghost'} btn-sm" id="tabIndicadores">Indicadores</button>
@@ -1108,15 +1118,6 @@ function maisView(){
       <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
       <div class="note">Novo cadastro sempre entra como usuário comum, com acesso a consultar estoque e retirar material. Só existe um acesso master (administrador).</div>
     </div>`;
-    DB.usuarios.forEach(u=>{
-      html += `<div class="tag-card"><div class="inner">
-        <div class="row1"><b>${u.nome}</b><span class="codigo">${u.master?'master':'usuário'}</span></div>
-        ${u.ativo===false?'<span class="pill C">inativo</span>':''}
-        ${!u.master?`<button class="btn btn-ghost btn-sm toggleUser" data-id="${u.id}">${u.ativo===false?'Reativar':'Desativar'}</button>`:''}
-      </div></div>`;
-    });
-  } else if(maisTab==='credenciais' && master){
-    html += `<div class="note" style="margin-bottom:10px">Somente o acesso master (login 1234) vê esta aba. Aqui você altera login e senha de qualquer usuário, inclusive o master.</div>`;
     html += `<div class="card">
       <div class="row1"><b>WhatsApp para resumo de retiradas</b></div>
       <div class="note">Sempre que uma retirada for confirmada, o resumo será aberto no WhatsApp para este número.</div>
@@ -1124,15 +1125,20 @@ function maisView(){
       <input id="whatsappResumo" placeholder="Ex: 5547999999999" value="${DB.config.whatsappResumo||''}">
       <button class="btn btn-primary btn-sm" id="saveWhatsappBtn">Salvar número</button>
     </div>`;
+    html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Usuários cadastrados</h2>`;
     DB.usuarios.forEach(u=>{
       html += `<div class="card">
-        <div class="row1"><b>${u.nome}</b>${u.master?' <span class="pill B">master</span>':''}</div>
+        <div class="row1"><b>${u.nome}</b>${u.master?' <span class="pill B">master</span>':''}${u.ativo===false?' <span class="pill C">inativo</span>':''}</div>
         <label>Login</label><input class="credLogin" data-id="${u.id}" value="${u.login}">
-        <label>Senha</label><input class="credSenha" data-id="${u.id}" type="text" value="${u.senha}">
+        <label>Senha</label><div class="pwd-wrap"><input class="credSenha" id="credSenha-${u.id}" data-id="${u.id}" type="password" value="${u.senha}"><button type="button" class="pwd-toggle" data-target="credSenha-${u.id}">${ICONS.eye}</button></div>
         <div class="row-2">
           <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
-          <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR de acesso</button>
+          <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR</button>
         </div>
+        ${!u.master?`<div class="row-2">
+          <button class="btn btn-ghost btn-sm toggleUser" data-id="${u.id}">${u.ativo===false?'Reativar':'Desativar'}</button>
+          <button class="btn btn-danger btn-sm deleteUser" data-id="${u.id}">Excluir</button>
+        </div>`:''}
       </div>`;
     });
     html += `<div id="loginQrModalHolder"></div>`;
@@ -1153,7 +1159,6 @@ function attachMaisEvents(){
   const talert = document.getElementById('tabAlertas'); if(talert) talert.onclick=()=>{maisTab='alertas'; renderView();};
   const tind = document.getElementById('tabIndicadores'); if(tind) tind.onclick=()=>{maisTab='indicadores'; renderView();};
   const tie = document.getElementById('tabImportExport'); if(tie) tie.onclick=()=>{maisTab='importexport'; renderView();};
-  const tcred = document.getElementById('tabCredenciais'); if(tcred) tcred.onclick=()=>{maisTab='credenciais'; renderView();};
   const tinv = document.getElementById('tabInventario'); if(tinv) tinv.onclick=()=>{maisTab='inventario'; renderView();};
 
   const addCentro = document.getElementById('addCentroBtn');
@@ -1191,6 +1196,16 @@ function attachMaisEvents(){
   };
   document.querySelectorAll('.toggleUser').forEach(b=>{
     b.onclick = async ()=>{ const u = DB.usuarios.find(x=>x.id===b.dataset.id); u.ativo = u.ativo===false; await saveAll(KEYS.usuarios, DB.usuarios); renderView(); };
+  });
+  document.querySelectorAll('.deleteUser').forEach(b=>{
+    b.onclick = async ()=>{
+      const u = DB.usuarios.find(x=>x.id===b.dataset.id);
+      if(u && u.master){ toast('Não é possível excluir o acesso master'); return; }
+      if(!confirm(`Excluir o usuário "${u?u.nome:''}" definitivamente? Retiradas antigas feitas por ele continuam no histórico.`)) return;
+      DB.usuarios = DB.usuarios.filter(x=>x.id!==b.dataset.id);
+      await saveAll(KEYS.usuarios, DB.usuarios);
+      toast('Usuário excluído'); renderView();
+    };
   });
 
   const saveWhatsBtn = document.getElementById('saveWhatsappBtn');
@@ -1413,6 +1428,11 @@ function handleImportFile(e){
 
         const existente = arr.find(p=>p.codigo.toLowerCase()===codigo.toLowerCase());
         if(!existente){
+          const dup = codigoJaExisteEmOutroModulo(codigo, null);
+          if(dup.existe){
+            ignorados++;
+            continue;
+          }
           arr.push({id:uid(), codigo, descricao, endereco, unidade, quantidade, valorUnitario, estoqueMinimo, foto:'', ativo:true, dataCadastro:new Date().toISOString()});
           novos++;
         } else {
