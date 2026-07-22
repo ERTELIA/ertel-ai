@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>ERTEL — Controle de Estoque</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#E7ECF3;
+    --muted:#8A96A8;
+    --paper:#0A0E15;
+    --paper-2:#141C2B;
+    --panel:#121927;
+    --line:rgba(255,255,255,.09);
+    --steel:#3E8EE0;
+    --steel-dark:#0A0F18;
+    --amber:#E8A33D;
+    --amber-dark:#B9791F;
+    --brick:#EF5B5B;
+    --moss:#34C77B;
+    --white:#FFFFFF;
+    --radius:10px;
+    --font-display:'Barlow Condensed', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'Roboto Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:
+      radial-gradient(ellipse at 85% 0%, rgba(62,142,224,.10), transparent 45%),
+      radial-gradient(ellipse at 0% 100%, rgba(232,163,61,.06), transparent 45%),
+      var(--paper);
+    position:relative;padding-bottom:74px;}
+
+  /* Top bar */
+  .topbar{background:var(--steel-dark);color:var(--white);padding:16px 18px 14px;position:sticky;top:0;z-index:10;border-bottom:1px solid rgba(255,255,255,.06);}
+  .topbar .brand{font-family:var(--font-display);font-weight:700;font-size:26px;letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+  .brand .tag{width:9px;height:9px;background:var(--amber);border-radius:2px;display:inline-block;box-shadow:0 0 8px rgba(232,163,61,.7);}
+  .topbar .sub{font-size:12px;opacity:.6;margin-top:2px;font-family:var(--font-mono);letter-spacing:.5px;}
+  .topbar .userchip{position:absolute;right:16px;top:16px;font-size:11px;font-family:var(--font-mono);opacity:.85;text-align:right;cursor:pointer;}
+
+  /* Bottom nav */
+  .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--steel-dark);display:flex;z-index:20;border-top:1px solid rgba(255,255,255,.08);}
+  .nav button{flex:1;background:none;border:none;color:rgba(255,255,255,.4);font-family:var(--font-body);font-size:10.5px;padding:9px 2px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;letter-spacing:.3px;}
+  .nav button.active{color:var(--amber);}
+  .nav svg{width:20px;height:20px;}
+
+  .view{padding:16px;}
+  .hidden{display:none !important;}
+
+  h2.section-title{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.5px;font-size:19px;margin:0 0 12px;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  h2.section-title::before{content:"";width:4px;height:16px;background:var(--amber);display:inline-block;box-shadow:0 0 6px rgba(232,163,61,.6);}
+
+  /* Cards */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+  .tag-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:0;margin-bottom:10px;overflow:hidden;position:relative;}
+  .tag-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--steel);box-shadow:0 0 8px rgba(62,142,224,.5);}
+  .tag-card.alert::before{background:var(--brick);box-shadow:0 0 8px rgba(239,91,91,.5);}
+  .tag-card .inner{padding:12px 14px 12px 16px;}
+  .tag-card .row1{display:flex;justify-content:space-between;align-items:baseline;}
+  .tag-card .codigo{font-family:var(--font-mono);font-size:11px;color:#7FB4EE;background:rgba(62,142,224,.12);padding:2px 6px;border-radius:4px;letter-spacing:.5px;}
+  .tag-card .desc{font-weight:600;font-size:14.5px;margin-top:5px;color:var(--ink);}
+  .tag-card .meta{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);}
+  .tag-card .qtd{font-weight:700;color:var(--ink);}
+  .tag-card .qtd.low{color:var(--brick);}
+  .pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:20px;letter-spacing:.4px;}
+  .pill.A{background:rgba(52,199,123,.15);color:#4ADE80;}
+  .pill.B{background:rgba(232,163,61,.18);color:#F0B44E;}
+  .pill.C{background:rgba(239,91,91,.15);color:#F87171;}
+
+  /* Metrics grid */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .metric{background:linear-gradient(160deg,#122036,#0B111C);border:1px solid rgba(62,142,224,.18);color:var(--white);border-radius:var(--radius);padding:14px;}
+  .metric .val{font-family:var(--font-display);font-size:26px;font-weight:700;}
+  .metric .lbl{font-size:10.5px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+  .metric.amber{background:linear-gradient(160deg,#3a2a10,#241a08);border-color:rgba(232,163,61,.25);}
+
+  /* Forms */
+  label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.4px;}
+  input, select, textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;font-family:var(--font-body);font-size:14.5px;background:var(--paper-2);color:var(--ink);}
+  input::placeholder, textarea::placeholder{color:rgba(255,255,255,.3);}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--steel);box-shadow:0 0 0 3px rgba(62,142,224,.15);}
+  input[type=number]{font-family:var(--font-mono);}
+  select{color-scheme:dark;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:13px;border-radius:8px;border:none;font-weight:600;font-size:14.5px;cursor:pointer;font-family:var(--font-body);margin-top:14px;}
+  .btn-primary{background:linear-gradient(180deg,#4C97E6,#2E6FBE);color:var(--white);box-shadow:0 4px 14px rgba(62,142,224,.28);}
+  .btn-primary:active{background:var(--steel-dark);}
+  .btn-amber{background:linear-gradient(180deg,#F0A83E,#D9791E);color:#1B1305;box-shadow:0 4px 14px rgba(217,121,30,.28);}
+  .btn-outline{background:none;border:1.5px solid var(--steel);color:#7FB4EE;}
+  .btn-ghost{background:var(--paper-2);color:var(--ink);border:1px solid var(--line);}
+  .btn-danger{background:linear-gradient(180deg,#F16A6A,#D64545);color:var(--white);}
+  .btn-sm{padding:8px;font-size:12.5px;margin-top:8px;}
+  .row-2{display:flex;gap:10px;}
+  .row-2 > *{flex:1;}
+
+  .search{display:flex;gap:8px;margin-bottom:12px;}
+  .search input{flex:1;}
+  .tabs-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .tabs-wrap button{flex:0 0 auto;width:auto;margin-top:0;padding:8px 13px;}
+
+  .empty{text-align:center;padding:40px 16px;color:var(--muted);}
+  .empty .icon{font-size:34px;margin-bottom:8px;}
+
+  /* Login */
+  .login-wrap{min-height:100vh;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:36px 24px;
+    background:
+      radial-gradient(ellipse at 78% 12%, rgba(70,140,220,.30), transparent 55%),
+      radial-gradient(ellipse at 90% 75%, rgba(232,163,61,.12), transparent 55%),
+      linear-gradient(180deg,#080B10 0%,#0C121C 55%,#080B10 100%);
+  }
+  .login-wrap::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:32px 32px;
+    mask-image:radial-gradient(ellipse at 65% 25%, black, transparent 72%);
+    -webkit-mask-image:radial-gradient(ellipse at 65% 25%, black, transparent 72%);
+  }
+  .login-content{position:relative;z-index:1;}
+  .login-logo-row{display:flex;align-items:center;gap:14px;margin-bottom:2px;}
+  .gear-badge{width:58px;height:58px;border-radius:50%;flex-shrink:0;
+    background:repeating-conic-gradient(#4a5a6d 0deg 13deg, transparent 13deg 26deg);
+    display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,.5));}
+  .gear-badge .inner-circle{width:74%;height:74%;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#2b3846,#10151c);
+    border:2px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;}
+  .gear-badge .letter{font-family:var(--font-display);font-weight:700;font-size:24px;
+    background:linear-gradient(180deg,#F5B15A,#D9791E);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .login-brand2 .word{font-family:var(--font-display);font-size:38px;font-weight:700;letter-spacing:3px;line-height:1;
+    background:linear-gradient(180deg,#F2F4F7,#AEB8C4);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .login-brand2 .sub{font-family:var(--font-body);font-weight:700;font-size:11.5px;letter-spacing:2.2px;color:var(--amber);margin-top:3px;}
+  .login-tagline{font-size:11px;color:rgba(255,255,255,.4);margin:14px 0 22px;letter-spacing:.2px;line-height:1.5;}
+  .field-icon-wrap{position:relative;margin-bottom:12px;}
+  .field-icon-wrap input{width:100%;padding:14px 14px 14px 42px;border-radius:8px;
+    background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.14);color:#fff;font-size:14.5px;font-family:var(--font-body);}
+  .field-icon-wrap input::placeholder{color:rgba(255,255,255,.38);}
+  .field-icon-wrap input:focus{outline:none;border-color:var(--amber);background:rgba(255,255,255,.08);}
+  .field-icon-wrap .ficon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.45);display:flex;}
+  .field-icon-wrap .ficon svg{width:17px;height:17px;}
+  .field-icon-wrap.pwd-wrap input{padding-right:42px;}
+  .field-icon-wrap.pwd-wrap .pwd-toggle{color:rgba(255,255,255,.45);}
+  .login-row-between{display:flex;justify-content:space-between;align-items:center;margin:2px 0 20px;font-size:12.5px;}
+  .remember{display:flex;align-items:center;gap:7px;color:rgba(255,255,255,.6);}
+  .remember input[type=checkbox]{accent-color:var(--amber);width:15px;height:15px;}
+  .forgot-link{color:var(--amber);background:none;border:none;font-size:12.5px;cursor:pointer;padding:0;font-family:var(--font-body);}
+  .btn-login-primary{width:100%;padding:15px;border:none;border-radius:9px;
+    background:linear-gradient(180deg,#F0A83E,#D9791E);color:#1B1305;font-weight:700;font-size:14.5px;
+    letter-spacing:1px;cursor:pointer;box-shadow:0 8px 20px rgba(217,121,30,.3);text-transform:uppercase;}
+  .divider-ou{display:flex;align-items:center;gap:10px;margin:18px 0;color:rgba(255,255,255,.32);font-size:10.5px;letter-spacing:1.5px;}
+  .divider-ou::before,.divider-ou::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.14);}
+  .btn-qr-login{width:100%;padding:13px;border-radius:9px;border:1.5px solid rgba(100,165,255,.4);
+    background:rgba(100,165,255,.07);color:#8fc4ff;font-weight:600;font-size:13px;letter-spacing:.6px;
+    display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;text-transform:uppercase;}
+  .btn-qr-login svg{width:18px;height:18px;}
+  .login-features{display:flex;justify-content:space-between;margin-top:34px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08);}
+  .lf-item{display:flex;flex-direction:column;align-items:center;gap:6px;color:rgba(255,255,255,.42);font-size:9px;letter-spacing:.3px;text-transform:uppercase;}
+  .lf-item svg{width:19px;height:19px;color:rgba(255,255,255,.5);}
+  .login-err{color:#ff8a8a;font-size:12px;margin-top:2px;min-height:14px;}
+
+  /* Modal / overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center;}
+  .sheet{background:var(--paper);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:18px;max-height:88vh;overflow-y:auto;}
+  .sheet .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .sheet .close{font-size:22px;background:none;border:none;color:var(--muted);cursor:pointer;}
+
+  .qr-box{background:#000;border-radius:10px;overflow:hidden;position:relative;margin-bottom:10px;aspect-ratio:1/1;}
+  .qr-box video{width:100%;height:100%;object-fit:cover;}
+  .qr-frame{position:absolute;inset:15%;border:2.5px solid var(--amber);border-radius:8px;}
+
+  .mic-btn{width:64px;height:64px;border-radius:50%;background:var(--amber);border:none;display:flex;align-items:center;justify-content:center;margin:14px auto;cursor:pointer;}
+  .mic-btn.listening{background:var(--brick);animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(179,63,63,.5);}100%{box-shadow:0 0 0 16px rgba(179,63,63,0);}}
+
+  .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:#1B2230;border:1px solid rgba(255,255,255,.12);color:var(--white);padding:11px 18px;border-radius:30px;font-size:13px;z-index:100;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;}
+  .pwd-wrap{position:relative;}
+  .pwd-wrap input{padding-right:42px;}
+  .pwd-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:6px;cursor:pointer;color:var(--muted);display:flex;align-items:center;}
+  .pwd-toggle:active{color:var(--steel);}
+  .pwd-toggle svg{width:19px;height:19px;}
+  .link-btn{background:none;border:none;color:var(--steel);text-decoration:underline;font-size:12.5px;cursor:pointer;padding:0;}
+  table.abc{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.abc th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);padding:4px 4px;border-bottom:1px solid var(--line);}
+  table.abc td{padding:6px 4px;border-bottom:1px solid var(--paper-2);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============ STORAGE HELPERS ============ */
+const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub' };
+
+async function loadAll(key, fallback){
+  try{
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 6000));
+    const r = await Promise.race([window.storage.get(key, true), timeout]);
+    return r && r.value ? JSON.parse(r.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function saveAll(key, value){
+  try{ await window.storage.set(key, JSON.stringify(value), true); }catch(e){ console.error('storage error', e); }
+}
+
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[] };
+let currentUser = null; // {id, nome, perfil}
+let currentView = 'dashboard';
+let scanStream = null;
+let moduloAtivo = null; // 'mro' | 'lub'
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function money(v){ return (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function today(){ return new Date(); }
+function sameMonth(d, ref){ const a=new Date(d); return a.getMonth()===ref.getMonth() && a.getFullYear()===ref.getFullYear(); }
+
+async function bootstrap(){
+  DB.produtos = await loadAll(KEYS.produtos, []);
+  DB.retiradas = await loadAll(KEYS.retiradas, []);
+  DB.centros = await loadAll(KEYS.centros, []);
+  DB.usuarios = await loadAll(KEYS.usuarios, []);
+  DB.config = await loadAll(KEYS.config, {whatsappResumo:''});
+  DB.produtosLub = await loadAll(KEYS.produtosLub, []);
+  DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
+  if(!DB.usuarios.some(u=>u.master===true)){
+    DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
+    await saveAll(KEYS.usuarios, DB.usuarios);
+  }
+  render();
+}
+function isMaster(){
+  const u = DB.usuarios.find(x=>x.id===(currentUser&&currentUser.id));
+  return !!(u && u.master===true);
+}
+
+/* ============ TOAST ============ */
+function toast(msg){
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2400);
+}
+
+/* ============ ICONS (inline svg, stroke=currentColor) ============ */
+const ICONS = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+  out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
+  hist:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
+  more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
+  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="#1B1D1F" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><path d="M12 19v4"/></svg>',
+  qr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0112 20c-7 0-11-8-11-8a19.86 19.86 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 8 11 8a19.86 19.86 0 01-3.22 4.44"/><path d="M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>',
+  user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>',
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>',
+  clockR:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
+  trendUp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>',
+  camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  mapPin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  clipboard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h6a1 1 0 011 1v2H8V3a1 1 0 011-1z"/><path d="M6 4h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M9 12l2 2 4-4"/></svg>',
+  fileDown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 11v6"/><path d="M9.5 14.5L12 17l2.5-2.5"/></svg>'
+};
+
+/* ============ ROOT RENDER ============ */
+function render(){
+  const app = document.getElementById('app');
+  if(!currentUser){ app.innerHTML = loginScreen(); attachLoginEvents(); return; }
+  if(!moduloAtivo){ app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
+  const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : 'Estoque MRO';
+  const rotuloProdutos = moduloAtivo==='lub' ? 'Óleos' : 'Produtos';
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="brand"><span class="tag"></span>ERTEL</div>
+      <div class="sub">${rotulo} · <button class="link-btn" id="trocarModuloBtn" style="color:inherit;opacity:.85">trocar módulo</button></div>
+      <div class="userchip" id="logoutBtn">${currentUser.nome}<br>(${isMaster()?'master':'usuário'}) · sair</div>
+    </div>
+    <div class="view" id="viewArea"></div>
+    <div class="nav">
+      <button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
+      <button data-v="produtos"><span>${ICONS.box}</span>${rotuloProdutos}</button>
+      <button data-v="retirada"><span>${ICONS.out}</span>Retirar</button>
+      <button data-v="historico"><span>${ICONS.hist}</span>Histórico</button>
+      <button data-v="mais"><span>${ICONS.more}</span>Mais</button>
+    </div>
+  `;
+  document.getElementById('logoutBtn').onclick = ()=>{ currentUser=null; moduloAtivo=null; render(); };
+  document.getElementById('trocarModuloBtn').onclick = (e)=>{ e.stopPropagation(); moduloAtivo=null; currentView='dashboard'; render(); };
+  document.querySelectorAll('.nav button').forEach(b=>{
+    b.onclick = ()=>{ currentView=b.dataset.v; render(); };
+    if(b.dataset.v===currentView) b.classList.add('active');
+  });
+  renderView();
+}
+
+function moduloSelectorScreen(){
+  const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
+  const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
+  return `
+  <div class="login-wrap"><div class="login-content">
+    <div class="login-logo-row">
+      <div class="gear-badge"><div class="inner-circle"><span class="letter">E</span></div></div>
+      <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">SELECIONE O ACESSO</div></div>
+    </div>
+    <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
+
+    <div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="desc" style="font-size:17px">${ICONS.box} Estoque MRO</div><div class="note">Peças, materiais e manutenção geral</div></div>
+        ${isMaster() && alertasMro>0?`<span class="pill C">${alertasMro} alerta${alertasMro>1?'s':''}</span>`:''}
+      </div>
+    </div>
+    <div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="desc" style="font-size:17px">🛢️ Sala de Lubrificantes</div><div class="note">Óleos e lubrificantes</div></div>
+        ${isMaster() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
+      </div>
+    </div>
+
+    <button class="forgot-link" id="sairModuloBtn" style="margin-top:18px">Sair</button>
+  </div></div>`;
+}
+
+function resetModuleUiState(){
+  produtoSearch=''; editingProduto=null; showProdutoForm=false; pendingFotoDataUrl='';
+  retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
+  maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
+}
+
+function attachModuloSelectorEvents(){
+  document.querySelectorAll('.modSelCard').forEach(el=>{
+    el.onclick = ()=>{ moduloAtivo = el.dataset.mod; currentView='dashboard'; resetModuleUiState(); render(); };
+  });
+  const sairBtn = document.getElementById('sairModuloBtn');
+  if(sairBtn) sairBtn.onclick = ()=>{ currentUser=null; render(); };
+}
+
+function renderView(){
+  const el = document.getElementById('viewArea');
+  if(currentView==='dashboard') el.innerHTML = dashboardView();
+  else if(currentView==='produtos') { el.innerHTML = produtosView(); attachProdutosEvents(); return; }
+  else if(currentView==='retirada') { el.innerHTML = retiradaView(); attachRetiradaEvents(); return; }
+  else if(currentView==='historico') el.innerHTML = historicoView();
+  else if(currentView==='mais') { el.innerHTML = maisView(); attachMaisEvents(); attachCommonEvents(); return; }
+  attachCommonEvents();
+}
+function getProdutosArr(){ return moduloAtivo==='lub' ? DB.produtosLub : DB.produtos; }
+function getRetiradasArr(){ return moduloAtivo==='lub' ? DB.retiradasLub : DB.retiradas; }
+function getProdutosKey(){ return moduloAtivo==='lub' ? KEYS.produtosLub : KEYS.produtos; }
+function getRetiradasKey(){ return moduloAtivo==='lub' ? KEYS.retiradasLub : KEYS.retiradas; }
+async function setProdutosArr(arr){ if(moduloAtivo==='lub') DB.produtosLub = arr; else DB.produtos = arr; await saveAll(getProdutosKey(), arr); }
+async function setRetiradasArr(arr){ if(moduloAtivo==='lub') DB.retiradasLub = arr; else DB.retiradas = arr; await saveAll(getRetiradasKey(), arr); }
+
+/* ============ LOGIN ============ */
+let loginScanning = false;
+
+function loginScreen(){
+  return `
+  <div class="login-wrap"><div class="login-content">
+    <div class="login-logo-row">
+      <div class="gear-badge"><div class="inner-circle"><span class="letter">E</span></div></div>
+      <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">CONTROLE DE ESTOQUE</div></div>
+    </div>
+    <div class="login-tagline">Inteligência e precisão para o controle do seu estoque.</div>
+
+    <div class="field-icon-wrap">
+      <span class="ficon">${ICONS.user}</span>
+      <input id="loginUser" placeholder="Usuário" autocomplete="off">
+    </div>
+    <div class="field-icon-wrap pwd-wrap">
+      <span class="ficon">${ICONS.lock}</span>
+      <input id="loginPass" type="password" placeholder="Senha" autocomplete="off">
+      <button type="button" class="pwd-toggle" data-target="loginPass">${ICONS.eye}</button>
+    </div>
+
+    <div class="login-row-between">
+      <label class="remember"><input type="checkbox" id="rememberChk"> Lembrar meu acesso</label>
+      <button class="forgot-link" id="forgotBtn">Esqueceu a senha?</button>
+    </div>
+    <div class="login-err" id="loginError"></div>
+
+    <button class="btn-login-primary" id="loginBtn">Entrar</button>
+
+    <div class="divider-ou">OU</div>
+    <button class="btn-qr-login" id="qrLoginBtn"><span>${ICONS.qr}</span>Entrar com QR Code</button>
+
+    <div class="login-features">
+      <div class="lf-item">${ICONS.shield}Segurança</div>
+      <div class="lf-item">${ICONS.target}Precisão</div>
+      <div class="lf-item">${ICONS.clockR}Agilidade</div>
+      <div class="lf-item">${ICONS.trendUp}Eficiência</div>
+    </div>
+
+    <div id="loginScanHolder"></div>
+  </div></div>`;
+}
+
+async function attachLoginEvents(){
+  const doLogin = async (login, senha)=>{
+    login = (login===undefined ? document.getElementById('loginUser').value : login).trim();
+    senha = (senha===undefined ? document.getElementById('loginPass').value : senha).trim();
+    const u = DB.usuarios.find(x=>x.login===login && x.senha===senha && x.ativo!==false);
+    if(!u){ const err=document.getElementById('loginError'); if(err) err.textContent = 'Login ou senha incorretos.'; return; }
+    const remember = document.getElementById('rememberChk');
+    try{
+      if(remember && remember.checked) await window.storage.set('ertel:lastLogin', login, false);
+      else await window.storage.delete('ertel:lastLogin', false);
+    }catch(e){}
+    currentUser = {id:u.id, nome:u.nome, perfil:u.perfil};
+    render();
+  };
+  const loginBtn = document.getElementById('loginBtn');
+  if(loginBtn) loginBtn.onclick = ()=>doLogin();
+  const passField = document.getElementById('loginPass');
+  if(passField) passField.onkeydown = (e)=>{ if(e.key==='Enter') doLogin(); };
+
+  const forgotBtn = document.getElementById('forgotBtn');
+  if(forgotBtn) forgotBtn.onclick = ()=>toast('Fale com o administrador master para redefinir sua senha.');
+
+  const qrBtn = document.getElementById('qrLoginBtn');
+  if(qrBtn) qrBtn.onclick = ()=>{ loginScanning = true; renderLoginScanner(); };
+
+  attachCommonEvents();
+
+  try{
+    const r = await window.storage.get('ertel:lastLogin', false);
+    if(r && r.value){ const f=document.getElementById('loginUser'); if(f){ f.value = r.value; const chk=document.getElementById('rememberChk'); if(chk) chk.checked = true; } }
+  }catch(e){}
+
+  window._ertelDoLogin = doLogin;
+}
+
+function renderLoginScanner(){
+  const holder = document.getElementById('loginScanHolder');
+  if(!loginScanning){ holder.innerHTML=''; stopScanner(); return; }
+  holder.innerHTML = `<div class="overlay" id="loginScanOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Entrar com QR Code</h2><button class="close" id="closeLoginScan">×</button></div>
+    <div class="qr-box"><video id="scanVideo" autoplay playsinline muted></video><div class="qr-frame"></div></div>
+    <div class="note" id="scanStatus">Aponte a câmera para o QR Code de acesso fornecido pelo administrador.</div>
+    <canvas id="scanCanvas" class="hidden"></canvas>
+  </div></div>`;
+  document.getElementById('closeLoginScan').onclick = ()=>{ loginScanning=false; renderLoginScanner(); };
+  startLoginScanner();
+}
+
+async function startLoginScanner(){
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    const video = document.getElementById('scanVideo');
+    video.srcObject = scanStream;
+    const canvas = document.getElementById('scanCanvas');
+    const ctx = canvas.getContext('2d');
+    const tick = ()=>{
+      if(!loginScanning || !scanStream) return;
+      if(video.readyState === video.HAVE_ENOUGH_DATA){
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        if(code && code.data){
+          const parts = code.data.split(':');
+          if(parts.length===2){
+            stopScanner(); loginScanning=false; renderLoginScanner();
+            window._ertelDoLogin(parts[0], parts[1]);
+            return;
+          } else {
+            const st = document.getElementById('scanStatus'); if(st) st.textContent = 'QR Code inválido para acesso.';
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }catch(e){
+    const st = document.getElementById('scanStatus');
+    if(st) st.textContent = 'Não foi possível acessar a câmera.';
+  }
+}
+
+/* ============ DASHBOARD ============ */
+function abcClassification(){
+  const withValue = getProdutosArr().filter(p=>p.ativo!==false).map(p=>({...p, total:(p.quantidade||0)*(p.valorUnitario||0)}));
+  withValue.sort((a,b)=>b.total-a.total);
+  const grandTotal = withValue.reduce((s,p)=>s+p.total,0) || 1;
+  let cum = 0;
+  return withValue.map(p=>{
+    cum += p.total;
+    const pct = cum/grandTotal;
+    const classe = pct<=0.8 ? 'A' : (pct<=0.95 ? 'B' : 'C');
+    return {...p, classe};
+  });
+}
+
+function dashboardView(){
+  if(!isMaster()){
+    return `<h2 class="section-title">Bem-vindo</h2>
+    <div class="card">
+      <div class="desc">Olá, ${currentUser.nome}!</div>
+      <div class="note">Use as abas abaixo para consultar produtos e registrar retiradas de material.</div>
+    </div>`;
+  }
+
+  const produtosAtivos = getProdutosArr().filter(p=>p.ativo!==false);
+  const valorTotal = produtosAtivos.reduce((s,p)=>s+(p.quantidade||0)*(p.valorUnitario||0),0);
+  const qtdTotal = produtosAtivos.reduce((s,p)=>s+(p.quantidade||0),0);
+  const alertas = produtosAtivos.filter(p=>(p.quantidade||0) <= (p.estoqueMinimo||0));
+  const mesAtual = today();
+  const consumoMes = getRetiradasArr().filter(r=>sameMonth(r.dataHora, mesAtual)).reduce((s,r)=>s+(r.valorTotal||0),0);
+
+  const rotatividade = {};
+  getRetiradasArr().forEach(r=>{ rotatividade[r.produtoId] = (rotatividade[r.produtoId]||0) + (r.quantidadeRetirada||0); });
+  const top5 = Object.entries(rotatividade).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([pid,qtd])=>{
+    const p = getProdutosArr().find(x=>x.id===pid);
+    return {nome: p? p.descricao : '(produto removido)', qtd};
+  });
+
+  const custoPorCentro = {};
+  getRetiradasArr().filter(r=>sameMonth(r.dataHora, mesAtual)).forEach(r=>{
+    custoPorCentro[r.centroCustoId] = (custoPorCentro[r.centroCustoId]||0) + (r.valorTotal||0);
+  });
+  const centrosRank = Object.entries(custoPorCentro).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([cid,val])=>{
+    const c = DB.centros.find(x=>x.id===cid);
+    return {nome: c? c.descricao : cid, val};
+  });
+
+  const abc = abcClassification();
+  const abcCount = {A:0,B:0,C:0};
+  abc.forEach(p=>{ abcCount[p.classe]++; });
+
+  let html = `<h2 class="section-title">Painel Geral</h2>`;
+  html += `<div class="metrics">
+    <div class="metric"><div class="val">${qtdTotal}</div><div class="lbl">Itens em estoque</div></div>
+    <div class="metric"><div class="val" style="font-size:19px">${money(valorTotal)}</div><div class="lbl">Valor total estoque</div></div>
+    <div class="metric amber"><div class="val">${alertas.length}</div><div class="lbl">Alertas recompra</div></div>
+    <div class="metric" style="background:var(--moss)"><div class="val" style="font-size:17px">${money(consumoMes)}</div><div class="lbl">Consumido no mês</div></div>
+  </div>`;
+
+  if(alertas.length>0){
+    html += `<h2 class="section-title">Alertas de Recompra</h2>`;
+    alertas.slice(0,6).forEach(p=>{
+      html += `<div class="tag-card alert"><div class="inner">
+        <div class="row1"><span class="codigo">${p.codigo}</span><span class="qtd low">${p.quantidade} ${p.unidade||"un"}</span></div>
+        <div class="desc">${p.descricao}</div>
+        <div class="meta"><span>Mínimo: ${p.estoqueMinimo}</span><span>${money(p.valorUnitario)}/un</span></div>
+      </div></div>`;
+    });
+  }
+
+  html += `<h2 class="section-title">Top 5 — Mais Rotatividade</h2><div class="card">`;
+  if(top5.length===0) html += `<div class="note">Ainda sem retiradas registradas.</div>`;
+  top5.forEach((t,i)=>{ html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${i+1}. ${t.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${t.qtd} un.</span></div>`; });
+  html += `</div>`;
+
+  html += `<h2 class="section-title">Classificação ABC</h2><div class="card">
+    <div style="display:flex;justify-content:space-between;padding:6px 0"><span><span class="pill A">A</span> Maior valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.A} produtos</span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill B">B</span> Valor médio</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.B} produtos</span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill C">C</span> Menor valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.C} produtos</span></div>
+  </div>`;
+
+  if(centrosRank.length>0){
+    html += `<h2 class="section-title">Consumo por Centro de Custo (mês)</h2><div class="card">`;
+    centrosRank.forEach((c,i)=>{ html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${c.nome}</span><span style="font-family:var(--font-mono)">${money(c.val)}</span></div>`; });
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+/* ============ PRODUTOS ============ */
+let produtoSearch = '';
+let editingProduto = null;
+let showProdutoForm = false;
+let voiceState = { listening:false, transcript:'', parsed:null };
+let pendingFotoDataUrl = '';
+
+function produtosView(){
+  const isAdmin = isMaster();
+  const list = getProdutosArr().filter(p=>p.ativo!==false && (p.descricao.toLowerCase().includes(produtoSearch.toLowerCase()) || p.codigo.toLowerCase().includes(produtoSearch.toLowerCase())));
+
+  let html = `<h2 class="section-title">${moduloAtivo==='lub'?'Óleos':'Produtos'}</h2>`;
+  html += `<div class="search"><input id="prodSearch" placeholder="Buscar por código ou descrição" value="${produtoSearch}">
+    ${isAdmin?`<button class="btn btn-primary" style="width:auto;padding:11px 16px;margin:0" id="newProdBtn">+ Novo</button>`:''}
+  </div>`;
+
+  if(list.length===0){ html += `<div class="empty"><div class="icon">📦</div>Nenhum produto encontrado.</div>`; }
+  list.forEach(p=>{
+    const low = (p.quantidade||0) <= (p.estoqueMinimo||0);
+    html += `<div class="tag-card ${low?'alert':''}" data-pid="${p.id}">
+      <div class="inner">
+        <div class="row1" style="align-items:center">
+          <div style="display:flex;align-items:center;gap:9px">
+            ${p.foto?`<img src="${p.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+            <span class="codigo">${p.codigo}</span>
+          </div>
+          <span class="qtd ${low?'low':''}">${p.quantidade} ${p.unidade||"un"}</span>
+        </div>
+        <div class="desc">${p.descricao}</div>
+        <div class="meta"><span>Mín: ${p.estoqueMinimo}</span>${isAdmin?`<span>${money(p.valorUnitario)}/un · Total: ${money((p.quantidade||0)*(p.valorUnitario||0))}</span>`:'<span></span>'}</div>
+        ${p.endereco?`<div class="meta" style="margin-top:2px"><span>📍 ${p.endereco}</span><span></span></div>`:''}
+        ${isAdmin?`<div class="row-2" style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm editProd" data-id="${p.id}">Editar</button>
+          <button class="btn btn-ghost btn-sm qrProd" data-id="${p.id}">Ver QR Code</button>
+        </div>`:''}
+      </div>
+    </div>`;
+  });
+
+  if(showProdutoForm && isAdmin){
+    html += produtoFormSheet();
+  }
+  html += `<div id="qrModalHolder"></div>`;
+  return html;
+}
+
+function produtoFormSheet(){
+  const p = editingProduto || {codigo:'',descricao:'',quantidade:0,valorUnitario:0,estoqueMinimo:0,endereco:'',foto:'',unidade:(moduloAtivo==='lub'?'litro':'peça')};
+  const fotoAtual = pendingFotoDataUrl || p.foto || '';
+  const unidades = ['peça','metro','litro','kg','caixa','par','rolo','conjunto'];
+  return `
+  <div class="overlay" id="prodOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingProduto?(moduloAtivo==='lub'?'Editar Óleo':'Editar Produto'):(moduloAtivo==='lub'?'Novo Óleo':'Novo Produto')}</h2><button class="close" id="closeProdForm">×</button></div>
+
+    <button class="mic-btn ${voiceState.listening?'listening':''}" id="voiceBtn" title="Cadastrar por voz">${ICONS.mic}</button>
+    <div class="note" style="text-align:center">${voiceState.listening?'Ouvindo... fale o cadastro do material':'Toque no microfone para cadastrar por voz (ex: "cadastra parafuso M8, código PF1234, 50 unidades, 2 reais cada, mínimo 10")'}</div>
+    ${voiceState.transcript?`<div class="note" style="background:var(--paper-2);padding:8px;border-radius:6px;margin-top:8px"><b>Transcrição:</b> ${voiceState.transcript}</div>`:''}
+
+    <label>Foto do produto</label>
+    <div style="display:flex;align-items:center;gap:12px">
+      ${fotoAtual?`<img src="${fotoAtual}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+      <input type="file" accept="image/*" id="fFoto" style="flex:1">
+    </div>
+
+    <label>Código do produto</label>
+    <input id="fCodigo" value="${p.codigo}" placeholder="Ex: PF1234">
+    <label>Descrição</label>
+    <input id="fDescricao" value="${p.descricao}" placeholder="Ex: Parafuso M8 sextavado">
+    <label>Endereço (localização física)</label>
+    <input id="fEndereco" value="${p.endereco||''}" placeholder="Ex: Corredor 3, Prateleira B2">
+    <div class="row-2">
+      <div><label>Quantidade</label><input id="fQuantidade" type="number" value="${p.quantidade}"></div>
+      <div><label>Unidade</label><select id="fUnidade">${unidades.map(u=>`<option value="${u}" ${(p.unidade||'peça')===u?'selected':''}>${u}</option>`).join('')}</select></div>
+    </div>
+    <label>Valor unitário (R$)</label>
+    <input id="fValor" type="number" step="0.01" value="${p.valorUnitario}">
+    <label>Estoque mínimo (alerta de recompra)</label>
+    <input id="fMinimo" type="number" value="${p.estoqueMinimo}">
+    <button class="btn btn-primary" id="saveProdBtn">${editingProduto?'Salvar alterações':'Confirmar cadastro'}</button>
+    ${editingProduto?`<button class="btn btn-danger" id="deactivateProdBtn">Desativar produto</button>`:''}
+  </div></div>`;
+}
+
+function attachProdutosEvents(){
+  const s = document.getElementById('prodSearch');
+  if(s) s.oninput = ()=>{ produtoSearch = s.value; renderView(); const el=document.getElementById('prodSearch'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
+
+  const newBtn = document.getElementById('newProdBtn');
+  if(newBtn) newBtn.onclick = ()=>{ editingProduto=null; voiceState={listening:false,transcript:'',parsed:null}; pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
+
+  document.querySelectorAll('.editProd').forEach(b=>{
+    b.onclick = ()=>{ editingProduto = getProdutosArr().find(p=>p.id===b.dataset.id); pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
+  });
+  document.querySelectorAll('.qrProd').forEach(b=>{
+    b.onclick = ()=>{ showQrModal(b.dataset.id); };
+  });
+
+  const closeBtn = document.getElementById('closeProdForm');
+  if(closeBtn) closeBtn.onclick = ()=>{ showProdutoForm=false; pendingFotoDataUrl=''; renderView(); };
+
+  const fotoInput = document.getElementById('fFoto');
+  if(fotoInput) fotoInput.onchange = (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxSize = 360;
+        let w = img.width, h = img.height;
+        if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
+        else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        pendingFotoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        renderView();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveBtn = document.getElementById('saveProdBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    const codigo = document.getElementById('fCodigo').value.trim();
+    const descricao = document.getElementById('fDescricao').value.trim();
+    const endereco = document.getElementById('fEndereco').value.trim();
+    const unidade = document.getElementById('fUnidade').value;
+    const quantidade = parseFloat(document.getElementById('fQuantidade').value)||0;
+    const valorUnitario = parseFloat(document.getElementById('fValor').value)||0;
+    const estoqueMinimo = parseFloat(document.getElementById('fMinimo').value)||0;
+    if(!codigo || !descricao){ toast('Preencha código e descrição'); return; }
+    const foto = pendingFotoDataUrl || (editingProduto ? editingProduto.foto : '') || '';
+    if(editingProduto){
+      Object.assign(editingProduto, {codigo,descricao,endereco,unidade,quantidade,valorUnitario,estoqueMinimo,foto});
+    } else {
+      getProdutosArr().push({id:uid(),codigo,descricao,endereco,unidade,quantidade,valorUnitario,estoqueMinimo,foto,ativo:true,dataCadastro:new Date().toISOString()});
+    }
+    await saveAll(getProdutosKey(), getProdutosArr());
+    showProdutoForm=false; editingProduto=null; pendingFotoDataUrl=''; toast('Produto salvo'); renderView();
+  };
+
+  const deactivateBtn = document.getElementById('deactivateProdBtn');
+  if(deactivateBtn) deactivateBtn.onclick = async ()=>{
+    editingProduto.ativo = false;
+    await saveAll(getProdutosKey(), getProdutosArr());
+    showProdutoForm=false; editingProduto=null; toast('Produto desativado'); renderView();
+  };
+
+  const voiceBtn = document.getElementById('voiceBtn');
+  if(voiceBtn) voiceBtn.onclick = startVoiceCapture;
+}
+
+function showQrModal(pid){
+  const p = getProdutosArr().find(x=>x.id===pid);
+  if(!p) return;
+  const holder = document.getElementById('qrModalHolder');
+  holder.innerHTML = `<div class="overlay" id="qrOverlay"><div class="sheet" style="text-align:center">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">QR Code — ${p.codigo}</h2><button class="close" id="closeQr">×</button></div>
+    <div id="qrCanvasWrap" style="display:flex;justify-content:center;margin:16px 0"></div>
+    <div class="note">${p.descricao}</div>
+  </div></div>`;
+  document.getElementById('closeQr').onclick = ()=>{ holder.innerHTML=''; };
+  try{ new QRCode(document.getElementById('qrCanvasWrap'), {text:p.codigo, width:180, height:180}); }
+  catch(e){ document.getElementById('qrCanvasWrap').innerHTML = `<div class="note">Código: <b>${p.codigo}</b></div>`; }
+}
+
+/* ---- Voice capture + Claude API parsing ---- */
+function startVoiceCapture(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('Reconhecimento de voz não suportado neste navegador'); return; }
+  const rec = new SR();
+  rec.lang = 'pt-BR'; rec.interimResults = false; rec.maxAlternatives = 1;
+  voiceState.listening = true; renderView();
+  rec.onresult = async (e)=>{
+    const transcript = e.results[0][0].transcript;
+    voiceState.listening = false; voiceState.transcript = transcript;
+    renderView();
+    await parseVoiceToFields(transcript);
+  };
+  rec.onerror = ()=>{ voiceState.listening=false; toast('Não entendi, tente novamente'); renderView(); };
+  rec.onend = ()=>{ if(voiceState.listening){ voiceState.listening=false; renderView(); } };
+  rec.start();
+}
+
+async function parseVoiceToFields(transcript){
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:300,
+        system:'Você extrai dados de cadastro de material de estoque a partir de uma fala em português. Responda APENAS com um JSON puro (sem markdown, sem texto extra) no formato: {"codigo":"","descricao":"","quantidade":0,"valorUnitario":0,"estoqueMinimo":0}. Se algum campo não for mencionado, use 0 para números ou "" para texto.',
+        messages:[{role:'user', content: transcript}]
+      })
+    });
+    const data = await resp.json();
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    if(document.getElementById('fCodigo')) document.getElementById('fCodigo').value = parsed.codigo || '';
+    if(document.getElementById('fDescricao')) document.getElementById('fDescricao').value = parsed.descricao || '';
+    if(document.getElementById('fQuantidade')) document.getElementById('fQuantidade').value = parsed.quantidade || 0;
+    if(document.getElementById('fValor')) document.getElementById('fValor').value = parsed.valorUnitario || 0;
+    if(document.getElementById('fMinimo')) document.getElementById('fMinimo').value = parsed.estoqueMinimo || 0;
+    toast('Campos preenchidos — revise e confirme');
+  }catch(e){
+    console.error(e); toast('Não consegui interpretar o áudio, preencha manualmente');
+  }
+}
+
+/* ============ RETIRADA ============ */
+let retiradaSelectedProduto = null;
+let showScanner = false;
+let retiradaBusca = '';
+
+function retiradaView(){
+  let html = `<h2 class="section-title">${moduloAtivo==='lub'?'Retirar Óleo':'Nova Retirada'}</h2>`;
+  html += `<button class="btn btn-amber" id="scanBtn"><span>${ICONS.qr}</span>Escanear QR Code do material</button>`;
+
+  html += `<label style="margin-top:18px">Ou pesquise o produto no estoque</label>`;
+  html += `<input id="retBusca" placeholder="Buscar por código ou descrição" value="${retiradaBusca}">`;
+
+  if(retiradaBusca.trim() && !retiradaSelectedProduto){
+    const matches = getProdutosArr().filter(p=>p.ativo!==false && (p.descricao.toLowerCase().includes(retiradaBusca.toLowerCase()) || p.codigo.toLowerCase().includes(retiradaBusca.toLowerCase()))).slice(0,8);
+    if(matches.length===0){
+      html += `<div class="note">Nenhum produto encontrado.</div>`;
+    } else {
+      matches.forEach(p=>{
+        const semEstoque = (p.quantidade||0) <= 0;
+        html += `<div class="tag-card ${semEstoque?'alert':''} selRetProd" data-id="${p.id}" style="cursor:pointer">
+          <div class="inner">
+            <div class="row1"><span class="codigo">${p.codigo}</span><span class="qtd ${semEstoque?'low':''}">${p.quantidade} ${p.unidade||'un'}</span></div>
+            <div class="desc">${p.descricao}</div>
+            ${semEstoque?`<div class="note" style="color:var(--brick)">Sem estoque disponível</div>`:''}
+          </div>
+        </div>`;
+      });
+    }
+  }
+
+  const p = getProdutosArr().find(x=>x.id===retiradaSelectedProduto);
+  if(p){
+    const semEstoque = (p.quantidade||0) <= 0;
+    html += `<div class="card" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;gap:12px;align-items:center">
+          ${p.foto?`<img src="${p.foto}" style="width:54px;height:54px;object-fit:cover;border-radius:8px;flex-shrink:0">`:`<div style="width:54px;height:54px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0">${ICONS.box}</div>`}
+          <div>
+            <div class="desc">${p.descricao}</div>
+            <div class="meta" style="font-family:var(--font-mono);font-size:11.5px;margin-top:3px">${p.codigo}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="trocarProdBtn" style="width:auto;margin:0;padding:6px 10px;flex-shrink:0">Trocar</button>
+      </div>
+      <div class="meta" style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:10px">
+        <span>Disponível: ${p.quantidade} ${p.unidade||"un"}</span>${isMaster()?`<span>${money(p.valorUnitario)}/${p.unidade||"un"}</span>`:'<span></span>'}
+      </div>
+
+      ${semEstoque?`<div class="note" style="color:var(--brick);font-weight:600;margin-top:10px">Este produto está sem estoque disponível. Não é possível confirmar a retirada.</div>`:`
+      <label>Quantidade a retirar</label>
+      <input id="retQtd" type="number" min="1" max="${p.quantidade}" value="1">
+
+      <label>Centro de custo / Local de uso</label>
+      <select id="retCentro"><option value="">Selecione...</option>
+        ${DB.centros.filter(c=>c.ativo!==false).map(c=>`<option value="${c.id}">${c.codigo} — ${c.descricao}</option>`).join('')}
+      </select>
+      <div class="note">É obrigatório informar o local de uso antes de confirmar a retirada.</div>
+
+      <label>Nº da Ordem de Serviço (opcional)</label>
+      <input id="retOS" placeholder="Ex: OS-4521">
+
+      <button class="btn btn-primary" id="confirmRetiradaBtn">Confirmar retirada</button>`}
+    </div>`;
+  }
+
+  if(showScanner){
+    html += `<div class="overlay" id="scanOverlay"><div class="sheet">
+      <div class="sheet-head"><h2 class="section-title" style="margin:0">Escanear QR Code</h2><button class="close" id="closeScan">×</button></div>
+      <div class="qr-box"><video id="scanVideo" autoplay playsinline muted></video><div class="qr-frame"></div></div>
+      <div class="note" id="scanStatus">Aponte a câmera para o QR Code do material.</div>
+      <canvas id="scanCanvas" class="hidden"></canvas>
+    </div></div>`;
+  }
+  return html;
+}
+
+function attachRetiradaEvents(){
+  const scanBtn = document.getElementById('scanBtn');
+  if(scanBtn) scanBtn.onclick = ()=>{ showScanner=true; renderView(); startScanner(); };
+
+  const buscaInput = document.getElementById('retBusca');
+  if(buscaInput) buscaInput.oninput = ()=>{ retiradaBusca = buscaInput.value; renderView(); const el=document.getElementById('retBusca'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
+
+  document.querySelectorAll('.selRetProd').forEach(el=>{
+    el.onclick = ()=>{ retiradaSelectedProduto = el.dataset.id; retiradaBusca=''; renderView(); };
+  });
+
+  const trocarBtn = document.getElementById('trocarProdBtn');
+  if(trocarBtn) trocarBtn.onclick = ()=>{ retiradaSelectedProduto = null; renderView(); };
+
+  const confirmBtn = document.getElementById('confirmRetiradaBtn');
+  if(confirmBtn) confirmBtn.onclick = async ()=>{
+    const p = getProdutosArr().find(x=>x.id===retiradaSelectedProduto);
+    if(!p || (p.quantidade||0)<=0){ toast('Produto sem estoque disponível'); return; }
+    const qtd = parseFloat(document.getElementById('retQtd').value)||0;
+    const centroId = document.getElementById('retCentro').value;
+    const os = document.getElementById('retOS').value.trim();
+    if(!centroId){ toast('Informe o local de uso (centro de custo)'); return; }
+    if(qtd<=0 || qtd>p.quantidade){ toast('Quantidade inválida ou maior que o estoque disponível'); return; }
+    const centro = DB.centros.find(c=>c.id===centroId);
+    p.quantidade -= qtd;
+    const retirada = {
+      id:uid(), produtoId:p.id, produtoCodigo:p.codigo, quantidadeRetirada:qtd, usuarioId:currentUser.id,
+      centroCustoId:centroId, localUsoCodigo:centro.codigo, localUsoDescricao:centro.descricao,
+      ordemServico: os || '', dataHora:new Date().toISOString(), valorTotal: qtd*(p.valorUnitario||0), origem:'manual'
+    };
+    getRetiradasArr().unshift(retirada);
+    if(DB.config.whatsappResumo){
+      const dh = new Date(retirada.dataHora);
+      const linhas = [
+        `*ERTEL — Resumo de Retirada (${moduloAtivo==='lub'?'Sala de Lubrificantes':'Estoque MRO'})*`,
+        `Produto: ${p.descricao} (${p.codigo})`,
+        `Quantidade: ${qtd} ${p.unidade||'un'}`,
+        `Centro de custo: ${centro.codigo} — ${centro.descricao}`,
+        os?`OS: ${os}`:null,
+        `Usuário: ${currentUser.nome}`,
+        `Data/hora: ${dh.toLocaleDateString('pt-BR')} ${dh.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`
+      ].filter(Boolean).join('\n');
+      window.open(`https://wa.me/${DB.config.whatsappResumo}?text=${encodeURIComponent(linhas)}`, '_blank');
+    }
+    await saveAll(getProdutosKey(), getProdutosArr());
+    await saveAll(getRetiradasKey(), getRetiradasArr());
+    toast('Retirada confirmada — estoque atualizado');
+    retiradaSelectedProduto = null; retiradaBusca=''; renderView();
+  };
+
+  const closeScan = document.getElementById('closeScan');
+  if(closeScan) closeScan.onclick = ()=>{ stopScanner(); showScanner=false; renderView(); };
+}
+
+async function startScanner(){
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    const video = document.getElementById('scanVideo');
+    video.srcObject = scanStream;
+    const canvas = document.getElementById('scanCanvas');
+    const ctx = canvas.getContext('2d');
+    const tick = ()=>{
+      if(!showScanner || !scanStream) return;
+      if(video.readyState === video.HAVE_ENOUGH_DATA){
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        if(code && code.data){
+          const produto = getProdutosArr().find(p=>p.codigo===code.data);
+          if(produto){
+            stopScanner(); showScanner=false; retiradaSelectedProduto = produto.id;
+            renderView(); toast('Material identificado: '+produto.descricao);
+            return;
+          } else {
+            const st = document.getElementById('scanStatus'); if(st) st.textContent = 'Código lido não corresponde a nenhum produto cadastrado.';
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }catch(e){
+    const st = document.getElementById('scanStatus');
+    if(st) st.textContent = 'Não foi possível acessar a câmera. Verifique a permissão do navegador, ou selecione o produto manualmente.';
+  }
+}
+function stopScanner(){
+  if(scanStream){ scanStream.getTracks().forEach(t=>t.stop()); scanStream=null; }
+}
+
+/* ============ HISTÓRICO ============ */
+function historicoView(){
+  const isAdmin = isMaster();
+  const list = getRetiradasArr().filter(r=> isAdmin || r.usuarioId===currentUser.id);
+  let html = `<h2 class="section-title">Histórico de Retiradas</h2>`;
+  if(list.length===0){ html += `<div class="empty"><div class="icon">🗂️</div>Nenhuma retirada registrada ainda.</div>`; return html; }
+  list.forEach(r=>{
+    const p = getProdutosArr().find(x=>x.id===r.produtoId);
+    const u = DB.usuarios.find(x=>x.id===r.usuarioId);
+    const d = new Date(r.dataHora);
+    html += `<div class="card">
+      <div class="row1" style="display:flex;justify-content:space-between">
+        <b>${p? p.descricao : '(produto removido)'}</b><span style="font-family:var(--font-mono)">${r.quantidadeRetirada} ${p?(p.unidade||'un'):'un'}</span>
+      </div>
+      <div class="meta" style="font-family:var(--font-mono);font-size:11px;margin-top:2px">${r.produtoCodigo || (p?p.codigo:'')}</div>
+      <div class="meta" style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)">        <span>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+        ${isAdmin?`<span>${money(r.valorTotal)}</span>`:''}
+      </div>
+      <div class="note">Local de uso: ${r.localUsoCodigo} — ${r.localUsoDescricao} ${isAdmin && u? '· Por: '+u.nome : ''} ${r.origem==='qrcode'?'· via QR':''}</div>
+      ${r.ordemServico?`<div class="note">OS: <b>${r.ordemServico}</b></div>`:''}
+    </div>`;
+  });
+  return html;
+}
+
+/* ============ MAIS (admin + inventário) ============ */
+let maisTab = 'centros';
+function maisView(){
+  const master = isMaster();
+  if(!master){
+    return `<h2 class="section-title">Mais</h2><div class="empty"><div class="icon">🔒</div>Área restrita ao administrador master.</div>`;
+  }
+  let html = `<h2 class="section-title">Administração</h2>`;
+  html += `<div class="tabs-wrap">
+    <button class="btn ${maisTab==='centros'?'btn-primary':'btn-ghost'} btn-sm" id="tabCentros">Centros de Custo</button>
+    <button class="btn ${maisTab==='usuarios'?'btn-primary':'btn-ghost'} btn-sm" id="tabUsuarios">Usuários</button>
+    <button class="btn ${maisTab==='credenciais'?'btn-primary':'btn-ghost'} btn-sm" id="tabCredenciais">Credenciais</button>
+    <button class="btn ${maisTab==='inventario'?'btn-primary':'btn-ghost'} btn-sm" id="tabInventario">Inventário</button>
+    <button class="btn ${maisTab==='alertas'?'btn-primary':'btn-ghost'} btn-sm" id="tabAlertas">Alertas de Recompra</button>
+    <button class="btn ${maisTab==='indicadores'?'btn-primary':'btn-ghost'} btn-sm" id="tabIndicadores">Indicadores</button>
+    <button class="btn ${maisTab==='importexport'?'btn-primary':'btn-ghost'} btn-sm" id="tabImportExport">Importar/Exportar</button>
+  </div>`;
+
+  if(maisTab==='centros' && master){
+    html += `<div class="card">
+      <label>Código da área</label><input id="ccCodigo" placeholder="Ex: MAN-01">
+      <label>Descrição</label><input id="ccDescricao" placeholder="Ex: Manutenção — Linha 1">
+      <button class="btn btn-primary btn-sm" id="addCentroBtn">Adicionar centro de custo</button>
+    </div>`;
+    DB.centros.forEach(c=>{
+      html += `<div class="tag-card"><div class="inner">
+        <div class="row1"><span class="codigo">${c.codigo}</span>${c.ativo===false?'<span class="pill C">inativo</span>':''}</div>
+        <div class="desc">${c.descricao}</div>
+        <div class="row-2">
+          <button class="btn btn-ghost btn-sm toggleCentro" data-id="${c.id}">${c.ativo===false?'Reativar':'Desativar'}</button>
+          <button class="btn btn-danger btn-sm deleteCentro" data-id="${c.id}">Excluir</button>
+        </div>
+      </div></div>`;
+    });
+  } else if(maisTab==='usuarios' && master){
+    html += `<div class="card">
+      <label>Nome</label><input id="uNome" placeholder="Nome completo">
+      <label>Login</label><input id="uLogin" placeholder="Login de acesso">
+      <label>Senha</label><div class="pwd-wrap"><input id="uSenha" type="password" placeholder="Senha"><button type="button" class="pwd-toggle" data-target="uSenha">${ICONS.eye}</button></div>
+      <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
+      <div class="note">Novo cadastro sempre entra como usuário comum, com acesso a consultar estoque e retirar material. Só existe um acesso master (administrador).</div>
+    </div>`;
+    DB.usuarios.forEach(u=>{
+      html += `<div class="tag-card"><div class="inner">
+        <div class="row1"><b>${u.nome}</b><span class="codigo">${u.master?'master':'usuário'}</span></div>
+        ${u.ativo===false?'<span class="pill C">inativo</span>':''}
+        ${!u.master?`<button class="btn btn-ghost btn-sm toggleUser" data-id="${u.id}">${u.ativo===false?'Reativar':'Desativar'}</button>`:''}
+      </div></div>`;
+    });
+  } else if(maisTab==='credenciais' && master){
+    html += `<div class="note" style="margin-bottom:10px">Somente o acesso master (login 1234) vê esta aba. Aqui você altera login e senha de qualquer usuário, inclusive o master.</div>`;
+    html += `<div class="card">
+      <div class="row1"><b>WhatsApp para resumo de retiradas</b></div>
+      <div class="note">Sempre que uma retirada for confirmada, o resumo será aberto no WhatsApp para este número.</div>
+      <label>Número (com DDI e DDD, só números)</label>
+      <input id="whatsappResumo" placeholder="Ex: 5547999999999" value="${DB.config.whatsappResumo||''}">
+      <button class="btn btn-primary btn-sm" id="saveWhatsappBtn">Salvar número</button>
+    </div>`;
+    DB.usuarios.forEach(u=>{
+      html += `<div class="card">
+        <div class="row1"><b>${u.nome}</b>${u.master?' <span class="pill B">master</span>':''}</div>
+        <label>Login</label><input class="credLogin" data-id="${u.id}" value="${u.login}">
+        <label>Senha</label><input class="credSenha" data-id="${u.id}" type="text" value="${u.senha}">
+        <div class="row-2">
+          <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
+          <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR de acesso</button>
+        </div>
+      </div>`;
+    });
+    html += `<div id="loginQrModalHolder"></div>`;
+  } else if(maisTab==='inventario'){
+    html += inventarioSection();
+  } else if(maisTab==='alertas'){
+    html += alertasSection();
+  } else if(maisTab==='indicadores' && master){
+    html += indicadoresSection();
+  } else if(maisTab==='importexport' && master){
+    html += importExportSection();
+  }
+  return html;
+}
+function attachMaisEvents(){
+  const tc = document.getElementById('tabCentros'); if(tc) tc.onclick=()=>{maisTab='centros'; renderView();};
+  const tu = document.getElementById('tabUsuarios'); if(tu) tu.onclick=()=>{maisTab='usuarios'; renderView();};
+  const talert = document.getElementById('tabAlertas'); if(talert) talert.onclick=()=>{maisTab='alertas'; renderView();};
+  const tind = document.getElementById('tabIndicadores'); if(tind) tind.onclick=()=>{maisTab='indicadores'; renderView();};
+  const tie = document.getElementById('tabImportExport'); if(tie) tie.onclick=()=>{maisTab='importexport'; renderView();};
+  const tcred = document.getElementById('tabCredenciais'); if(tcred) tcred.onclick=()=>{maisTab='credenciais'; renderView();};
+  const tinv = document.getElementById('tabInventario'); if(tinv) tinv.onclick=()=>{maisTab='inventario'; renderView();};
+
+  const addCentro = document.getElementById('addCentroBtn');
+  if(addCentro) addCentro.onclick = async ()=>{
+    const codigo = document.getElementById('ccCodigo').value.trim();
+    const descricao = document.getElementById('ccDescricao').value.trim();
+    if(!codigo || !descricao){ toast('Preencha código e descrição'); return; }
+    if(DB.centros.some(c=>c.codigo.toLowerCase()===codigo.toLowerCase())){ toast('Já existe um centro de custo com esse código'); return; }
+    DB.centros.push({id:uid(), codigo, descricao, ativo:true});
+    await saveAll(KEYS.centros, DB.centros);
+    toast('Centro de custo adicionado'); renderView();
+  };
+  document.querySelectorAll('.toggleCentro').forEach(b=>{
+    b.onclick = async ()=>{ const c = DB.centros.find(x=>x.id===b.dataset.id); c.ativo = c.ativo===false; await saveAll(KEYS.centros, DB.centros); renderView(); };
+  });
+  document.querySelectorAll('.deleteCentro').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Excluir este centro de custo definitivamente? Retiradas antigas que usam ele continuam no histórico.')) return;
+      DB.centros = DB.centros.filter(c=>c.id!==b.dataset.id);
+      await saveAll(KEYS.centros, DB.centros);
+      toast('Centro de custo excluído'); renderView();
+    };
+  });
+
+  const addUser = document.getElementById('addUserBtn');
+  if(addUser) addUser.onclick = async ()=>{
+    const nome = document.getElementById('uNome').value.trim();
+    const login = document.getElementById('uLogin').value.trim();
+    const senha = document.getElementById('uSenha').value.trim();
+    if(!nome || !login || !senha){ toast('Preencha nome, login e senha'); return; }
+    if(DB.usuarios.some(x=>x.login===login)){ toast('Já existe um usuário com esse login'); return; }
+    DB.usuarios.push({id:uid(), nome, perfil:'usuario', login, senha, master:false, ativo:true});
+    await saveAll(KEYS.usuarios, DB.usuarios);
+    toast('Usuário adicionado'); renderView();
+  };
+  document.querySelectorAll('.toggleUser').forEach(b=>{
+    b.onclick = async ()=>{ const u = DB.usuarios.find(x=>x.id===b.dataset.id); u.ativo = u.ativo===false; await saveAll(KEYS.usuarios, DB.usuarios); renderView(); };
+  });
+
+  const saveWhatsBtn = document.getElementById('saveWhatsappBtn');
+  if(saveWhatsBtn) saveWhatsBtn.onclick = async ()=>{
+    const numero = document.getElementById('whatsappResumo').value.replace(/\D/g,'');
+    if(!numero){ toast('Informe um número válido'); return; }
+    DB.config.whatsappResumo = numero;
+    await saveAll(KEYS.config, DB.config);
+    toast('Número salvo'); renderView();
+  };
+
+  document.querySelectorAll('.saveCred').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!isMaster()) return;
+      const id = b.dataset.id;
+      const loginField = document.querySelector(`.credLogin[data-id="${id}"]`);
+      const senhaField = document.querySelector(`.credSenha[data-id="${id}"]`);
+      const novoLogin = loginField.value.trim();
+      const novaSenha = senhaField.value.trim();
+      if(!novoLogin || !novaSenha){ toast('Login e senha não podem ficar vazios'); return; }
+      if(DB.usuarios.some(x=>x.login===novoLogin && x.id!==id)){ toast('Já existe um usuário com esse login'); return; }
+      const u = DB.usuarios.find(x=>x.id===id);
+      u.login = novoLogin; u.senha = novaSenha;
+      await saveAll(KEYS.usuarios, DB.usuarios);
+      toast('Credenciais atualizadas'); renderView();
+    };
+  });
+
+  document.querySelectorAll('.genQrCred').forEach(b=>{
+    b.onclick = ()=>{
+      const u = DB.usuarios.find(x=>x.id===b.dataset.id);
+      const holder = document.getElementById('loginQrModalHolder');
+      holder.innerHTML = `<div class="overlay" id="loginQrOverlay"><div class="sheet" style="text-align:center">
+        <div class="sheet-head"><h2 class="section-title" style="margin:0">QR de Acesso — ${u.nome}</h2><button class="close" id="closeLoginQr">×</button></div>
+        <div id="loginQrCanvasWrap" style="display:flex;justify-content:center;margin:16px 0"></div>
+        <div class="note">Este código dá acesso direto ao ERTEL com o login de ${u.nome}. Compartilhe apenas com a própria pessoa.</div>
+      </div></div>`;
+      document.getElementById('closeLoginQr').onclick = ()=>{ holder.innerHTML=''; };
+      try{ new QRCode(document.getElementById('loginQrCanvasWrap'), {text:`${u.login}:${u.senha}`, width:180, height:180}); }
+      catch(e){ document.getElementById('loginQrCanvasWrap').innerHTML = `<div class="note">Não foi possível gerar o QR.</div>`; }
+    };
+  });
+
+  if(maisTab==='inventario') attachInventarioEvents();
+  if(maisTab==='indicadores') attachIndicadoresEvents();
+  if(maisTab==='importexport') attachImportExportEvents();
+}
+
+/* ============ INVENTÁRIO ============ */
+let invBusca = '';
+let invProdutoAtual = null;
+let invItens = [];
+let invScanning = false;
+let invNotFound = false;
+
+/* ============ INDICADORES ============ */
+let indModo = 'periodo';
+let indDia = new Date().toISOString().slice(0,10);
+let indInicio = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+let indFim = new Date().toISOString().slice(0,10);
+
+function filtrarRetiradasIndicadores(){
+  let ini, fim;
+  if(indModo==='dia'){ ini = new Date(indDia+'T00:00:00'); fim = new Date(indDia+'T23:59:59'); }
+  else { ini = new Date(indInicio+'T00:00:00'); fim = new Date(indFim+'T23:59:59'); }
+  return getRetiradasArr().filter(r=>{ const d = new Date(r.dataHora); return d>=ini && d<=fim; });
+}
+
+function indicadoresSection(){
+  let html = `<div class="row-2">
+    <button class="btn ${indModo==='dia'?'btn-primary':'btn-ghost'} btn-sm" id="indModoDia">Por dia</button>
+    <button class="btn ${indModo==='periodo'?'btn-primary':'btn-ghost'} btn-sm" id="indModoPeriodo">Por período</button>
+  </div>`;
+  if(indModo==='dia'){
+    html += `<label>Data</label><input type="date" id="indDataDia" value="${indDia}">`;
+  } else {
+    html += `<div class="row-2">
+      <div><label>De</label><input type="date" id="indDataIni" value="${indInicio}"></div>
+      <div><label>Até</label><input type="date" id="indDataFim" value="${indFim}"></div>
+    </div>`;
+  }
+  html += `<button class="btn btn-primary btn-sm" id="indAplicarBtn">Aplicar filtro</button>`;
+
+  const retiradas = filtrarRetiradasIndicadores();
+  const qtdGeral = retiradas.reduce((s,r)=>s+(r.quantidadeRetirada||0),0);
+  const custoTotal = retiradas.reduce((s,r)=>s+(r.valorTotal||0),0);
+
+  html += `<div class="metrics" style="margin-top:16px">
+    <div class="metric"><div class="val">${qtdGeral}</div><div class="lbl">Peças retiradas no período</div></div>
+    <div class="metric amber"><div class="val" style="font-size:18px">${money(custoTotal)}</div><div class="lbl">Custo total no período</div></div>
+  </div>`;
+
+  const porCentro = {};
+  retiradas.forEach(r=>{
+    if(!porCentro[r.centroCustoId]) porCentro[r.centroCustoId] = {qtd:0, custo:0};
+    porCentro[r.centroCustoId].qtd += (r.quantidadeRetirada||0);
+    porCentro[r.centroCustoId].custo += (r.valorTotal||0);
+  });
+  const centrosOrdenados = Object.entries(porCentro).sort((a,b)=>b[1].custo-a[1].custo);
+
+  html += `<h2 class="section-title" style="margin-top:18px">Custo e Quantidade por Centro de Custo</h2>`;
+  if(centrosOrdenados.length===0){ html += `<div class="empty"><div class="icon">📊</div>Nenhuma retirada no período selecionado.</div>`; }
+  else{
+    html += `<div class="card"><table class="abc"><tr><th>Centro de Custo</th><th>Qtd.</th><th>Custo</th></tr>`;
+    centrosOrdenados.forEach(([cid,v])=>{
+      const c = DB.centros.find(x=>x.id===cid);
+      html += `<tr><td>${c?c.descricao:cid}</td><td>${v.qtd}</td><td>${money(v.custo)}</td></tr>`;
+    });
+    html += `</table></div>`;
+  }
+  return html;
+}
+
+function attachIndicadoresEvents(){
+  const dDia = document.getElementById('indModoDia'); if(dDia) dDia.onclick=()=>{indModo='dia'; renderView();};
+  const dPer = document.getElementById('indModoPeriodo'); if(dPer) dPer.onclick=()=>{indModo='periodo'; renderView();};
+  const aplicarBtn = document.getElementById('indAplicarBtn');
+  if(aplicarBtn) aplicarBtn.onclick = ()=>{
+    if(indModo==='dia'){ indDia = document.getElementById('indDataDia').value || indDia; }
+    else { indInicio = document.getElementById('indDataIni').value || indInicio; indFim = document.getElementById('indDataFim').value || indFim; }
+    renderView();
+  };
+}
+
+
+/* ============ IMPORTAR / EXPORTAR ============ */
+const FORMATO_COLUNAS_IMPORT = ['Código','Descrição','Endereço','Unidade','Quantidade','Valor Unitário','Estoque Mínimo'];
+let exportRetIni = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+let exportRetFim = new Date().toISOString().slice(0,10);
+
+function importExportSection(){
+  let html = `<h2 class="section-title" style="font-size:16px">Importar Planilha</h2>
+  <div class="card">
+    <div class="note">Importa uma lista de materiais em Excel (.xlsx) ou CSV para cadastrar produtos em massa no módulo ${moduloAtivo==='lub'?'Sala de Lubrificantes':'Estoque MRO'} atual.</div>
+    <button class="btn btn-primary btn-sm" id="importarBtn">Importar planilha</button>
+    <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" class="hidden">
+  </div>
+
+  <h2 class="section-title" style="font-size:16px;margin-top:20px">Extrair Dados (Excel)</h2>
+  <div class="card">
+    <div class="note">Lista completa dos produtos cadastrados no módulo atual, com saldo final em estoque.</div>
+    <button class="btn btn-outline btn-sm" id="exportProdutosBtn">Exportar produtos cadastrados</button>
+  </div>
+  <div class="card">
+    <div class="note">Lista de todas as retiradas do módulo atual em um período, com todas as informações do registro.</div>
+    <div class="row-2">
+      <div><label>De</label><input type="date" id="exportRetIniInput" value="${exportRetIni}"></div>
+      <div><label>Até</label><input type="date" id="exportRetFimInput" value="${exportRetFim}"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" id="exportRetiradasBtn">Exportar retiradas do período</button>
+  </div>
+
+  <div id="importFormatModalHolder"></div>`;
+  return html;
+}
+
+function attachImportExportEvents(){
+  const importarBtn = document.getElementById('importarBtn');
+  if(importarBtn) importarBtn.onclick = showImportFormatModal;
+
+  const fileInput = document.getElementById('importFileInput');
+  if(fileInput) fileInput.onchange = handleImportFile;
+
+  const expProdBtn = document.getElementById('exportProdutosBtn');
+  if(expProdBtn) expProdBtn.onclick = exportProdutosXlsx;
+
+  const expRetBtn = document.getElementById('exportRetiradasBtn');
+  if(expRetBtn) expRetBtn.onclick = ()=>{
+    exportRetIni = document.getElementById('exportRetIniInput').value || exportRetIni;
+    exportRetFim = document.getElementById('exportRetFimInput').value || exportRetFim;
+    exportRetiradasXlsx();
+  };
+}
+
+function showImportFormatModal(){
+  const holder = document.getElementById('importFormatModalHolder');
+  holder.innerHTML = `<div class="overlay" id="importFormatOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Formato da Planilha</h2><button class="close" id="closeImportFormat">×</button></div>
+    <div class="note">A primeira linha deve ser o cabeçalho. As colunas devem seguir exatamente esta ordem:</div>
+    <div class="card">
+      <table class="abc"><tr>${FORMATO_COLUNAS_IMPORT.map(c=>`<th>${c}</th>`).join('')}</tr>
+      <tr>${['PF1234','Parafuso M8','Cor. 3 - Prat. B2','peça','50','2.50','10'].map(v=>`<td>${v}</td>`).join('')}</tr></table>
+    </div>
+    <div class="note">Se algum código já existir no sistema, o app vai perguntar, um por um, se você quer atualizar o cadastro com os dados da planilha.</div>
+    <button class="btn btn-primary" id="continuarImportBtn">Continuar e escolher o arquivo</button>
+  </div></div>`;
+  document.getElementById('closeImportFormat').onclick = ()=>{ holder.innerHTML=''; };
+  document.getElementById('continuarImportBtn').onclick = ()=>{
+    holder.innerHTML='';
+    document.getElementById('importFileInput').click();
+  };
+}
+
+function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou. Verifique sua conexão.'); return; }
+  const reader = new FileReader();
+  reader.onload = async (ev)=>{
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      const dataRows = rows.slice(1).filter(r=>r && r[0] !== '' && r[0] !== undefined);
+      if(dataRows.length===0){ toast('Nenhum dado encontrado na planilha'); return; }
+
+      let novos=0, atualizados=0, ignorados=0;
+      const arr = getProdutosArr();
+
+      for(const row of dataRows){
+        const codigo = String(row[0]||'').trim();
+        const descricao = String(row[1]||'').trim();
+        const endereco = String(row[2]||'').trim();
+        const unidade = String(row[3]||'peça').trim() || 'peça';
+        const quantidade = parseFloat(row[4]) || 0;
+        const valorUnitario = parseFloat(row[5]) || 0;
+        const estoqueMinimo = parseFloat(row[6]) || 0;
+        if(!codigo || !descricao) continue;
+
+        const existente = arr.find(p=>p.codigo.toLowerCase()===codigo.toLowerCase());
+        if(!existente){
+          arr.push({id:uid(), codigo, descricao, endereco, unidade, quantidade, valorUnitario, estoqueMinimo, foto:'', ativo:true, dataCadastro:new Date().toISOString()});
+          novos++;
+        } else {
+          const msg = `O produto "${codigo}" já existe:\n\nCadastro atual: ${existente.descricao} — Qtd: ${existente.quantidade}\nNa planilha: ${descricao} — Qtd: ${quantidade}\n\nDeseja atualizar o cadastro com os dados da planilha?`;
+          if(confirm(msg)){
+            Object.assign(existente, {descricao, endereco, unidade, quantidade, valorUnitario, estoqueMinimo});
+            atualizados++;
+          } else {
+            ignorados++;
+          }
+        }
+      }
+      await saveAll(getProdutosKey(), arr);
+      toast(`Importação concluída: ${novos} novos, ${atualizados} atualizados, ${ignorados} ignorados`);
+      renderView();
+    }catch(err){
+      console.error(err);
+      toast('Não foi possível ler a planilha. Verifique o formato do arquivo.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportProdutosXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const arr = getProdutosArr().filter(p=>p.ativo!==false);
+  const rows = arr.map(p=>({
+    'Código': p.codigo,
+    'Descrição': p.descricao,
+    'Endereço': p.endereco||'',
+    'Unidade': p.unidade||'',
+    'Quantidade (Saldo Final)': p.quantidade,
+    'Valor Unitário': p.valorUnitario,
+    'Valor Total': (p.quantidade||0)*(p.valorUnitario||0),
+    'Estoque Mínimo': p.estoqueMinimo
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
+  XLSX.writeFile(wb, `produtos-${moduloAtivo==='lub'?'lubrificantes':'mro'}-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function exportRetiradasXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const ini = new Date(exportRetIni+'T00:00:00');
+  const fim = new Date(exportRetFim+'T23:59:59');
+  const arr = getRetiradasArr().filter(r=>{ const d = new Date(r.dataHora); return d>=ini && d<=fim; });
+  if(arr.length===0){ toast('Nenhuma retirada encontrada no período'); return; }
+  const rows = arr.map(r=>{
+    const p = getProdutosArr().find(x=>x.id===r.produtoId);
+    const u = DB.usuarios.find(x=>x.id===r.usuarioId);
+    const d = new Date(r.dataHora);
+    return {
+      'Data': d.toLocaleDateString('pt-BR'),
+      'Hora': d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
+      'Código': r.produtoCodigo || (p?p.codigo:''),
+      'Descrição': p? p.descricao : '(produto removido)',
+      'Quantidade': r.quantidadeRetirada,
+      'Unidade': p?(p.unidade||''):'',
+      'Valor Total': r.valorTotal,
+      'Centro de Custo': r.localUsoCodigo+' - '+r.localUsoDescricao,
+      'Ordem de Serviço': r.ordemServico||'',
+      'Usuário': u? u.nome : '',
+      'Origem': r.origem||''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Retiradas');
+  XLSX.writeFile(wb, `retiradas-${moduloAtivo==='lub'?'lubrificantes':'mro'}-${exportRetIni}_a_${exportRetFim}.xlsx`);
+}
+
+/* ============ ALERTAS DE RECOMPRA ============ */
+function alertasSection(){
+  const alertas = getProdutosArr().filter(p=>p.ativo!==false && (p.quantidade||0) <= (p.estoqueMinimo||0));
+  let html = `<div class="note" style="margin-bottom:10px">Produtos que atingiram o estoque mínimo e precisam de recompra.</div>`;
+  if(alertas.length===0){
+    html += `<div class="empty"><div class="icon">✅</div>Nenhum produto em ponto de recompra no momento.</div>`;
+    return html;
+  }
+  alertas.forEach(p=>{
+    html += `<div class="tag-card alert"><div class="inner">
+      <div class="row1"><span class="codigo">${p.codigo}</span><span class="qtd low">${p.quantidade} ${p.unidade||'un'}</span></div>
+      <div class="desc">${p.descricao}</div>
+      <div class="meta"><span>Estoque mínimo: ${p.estoqueMinimo}</span><span>${money(p.valorUnitario)}/${p.unidade||'un'}</span></div>
+      ${p.endereco?`<div class="meta" style="margin-top:2px"><span>📍 ${p.endereco}</span><span></span></div>`:''}
+    </div></div>`;
+  });
+  return html;
+}
+
+
+function inventarioSection(){
+  let html = `<div class="note" style="margin-bottom:10px">Digite o código do produto ou escaneie o QR Code para conferir a quantidade física.</div>`;
+  html += `<div class="search">
+    <input id="invCodigo" placeholder="Código do produto" value="${invBusca}">
+    <button class="btn btn-primary" style="width:auto;padding:11px 14px;margin:0" id="invBuscarBtn">Buscar</button>
+  </div>`;
+  html += `<button class="btn btn-amber" id="invScanBtn"><span>${ICONS.qr}</span>Escanear QR Code</button>`;
+
+  if(invNotFound){
+    html += `<div class="note" style="color:var(--brick)">Nenhum produto encontrado com esse código.</div>`;
+  }
+
+  if(invProdutoAtual){
+    const p = invProdutoAtual;
+    html += `<div class="card" style="margin-top:12px">
+      <div style="display:flex;gap:12px;align-items:center">
+        ${p.foto?`<img src="${p.foto}" style="width:54px;height:54px;object-fit:cover;border-radius:8px">`:`<div style="width:54px;height:54px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.box}</div>`}
+        <div>
+          <div class="desc">${p.descricao}</div>
+          <div class="meta" style="font-size:11.5px">${p.codigo}${p.endereco?' · 📍 '+p.endereco:''}</div>
+        </div>
+      </div>
+      <div class="meta" style="margin-top:10px"><span>Quantidade no sistema: <b>${p.quantidade}</b> ${p.unidade||"un"}</span></div>
+      <label>Quantidade física encontrada</label>
+      <input id="invFisica" type="number" placeholder="0">
+      <button class="btn btn-primary" id="invAddBtn">Adicionar à contagem</button>
+    </div>`;
+  }
+
+  if(invItens.length>0){
+    html += `<h2 class="section-title" style="margin-top:18px">Itens contados (${invItens.length})</h2>`;
+    invItens.forEach((it,idx)=>{
+      const desvio = it.fisica - it.sistema;
+      html += `<div class="tag-card ${desvio!==0?'alert':''}"><div class="inner">
+        <div class="row1"><span class="codigo">${it.codigo}</span><span class="qtd ${desvio!==0?'low':''}">${desvio>0?'+':''}${desvio}</span></div>
+        <div class="desc">${it.descricao}</div>
+        <div class="meta"><span>Sistema: ${it.sistema}</span><span>Físico: ${it.fisica}</span></div>
+        <button class="btn btn-ghost btn-sm removeInvItem" data-idx="${idx}" style="margin-top:8px">Remover</button>
+      </div></div>`;
+    });
+    html += `<div class="row-2" style="margin-top:8px">
+      <button class="btn btn-outline btn-sm" id="invExportPdf">${'Exportar PDF'}</button>
+      <button class="btn btn-outline btn-sm" id="invExportCsv">Exportar Excel (CSV)</button>
+    </div>
+    <button class="btn btn-danger btn-sm" id="invClearBtn">Limpar contagem</button>`;
+  }
+
+  html += `<div id="invScanHolder"></div>`;
+  return html;
+}
+
+function findProdutoByCodigo(codigo){
+  return getProdutosArr().find(p=>p.ativo!==false && p.codigo.toLowerCase()===codigo.trim().toLowerCase());
+}
+
+function attachInventarioEvents(){
+  const buscarBtn = document.getElementById('invBuscarBtn');
+  const codigoInput = document.getElementById('invCodigo');
+  const doBusca = ()=>{
+    invBusca = codigoInput.value;
+    const p = findProdutoByCodigo(invBusca);
+    invProdutoAtual = p || null;
+    invNotFound = !p && invBusca.trim()!=='';
+    renderView();
+  };
+  if(buscarBtn) buscarBtn.onclick = doBusca;
+  if(codigoInput) codigoInput.onkeydown = (e)=>{ if(e.key==='Enter') doBusca(); };
+
+  const scanBtn = document.getElementById('invScanBtn');
+  if(scanBtn) scanBtn.onclick = ()=>{ invScanning=true; renderInvScanner(); };
+
+  const addBtn = document.getElementById('invAddBtn');
+  if(addBtn) addBtn.onclick = ()=>{
+    const fisica = parseFloat(document.getElementById('invFisica').value);
+    if(isNaN(fisica)){ toast('Informe a quantidade física encontrada'); return; }
+    const p = invProdutoAtual;
+    const existing = invItens.findIndex(it=>it.produtoId===p.id);
+    const item = {produtoId:p.id, codigo:p.codigo, descricao:p.descricao, sistema:p.quantidade, fisica};
+    if(existing>=0) invItens[existing] = item; else invItens.push(item);
+    invProdutoAtual = null; invBusca=''; invNotFound=false;
+    toast('Item adicionado à contagem'); renderView();
+  };
+
+  document.querySelectorAll('.removeInvItem').forEach(b=>{
+    b.onclick = ()=>{ invItens.splice(parseInt(b.dataset.idx),1); renderView(); };
+  });
+
+  const clearBtn = document.getElementById('invClearBtn');
+  if(clearBtn) clearBtn.onclick = ()=>{ if(confirm('Limpar toda a contagem de inventário atual?')){ invItens=[]; renderView(); } };
+
+  const pdfBtn = document.getElementById('invExportPdf');
+  if(pdfBtn) pdfBtn.onclick = exportInventarioPdf;
+  const csvBtn = document.getElementById('invExportCsv');
+  if(csvBtn) csvBtn.onclick = exportInventarioCsv;
+}
+
+function renderInvScanner(){
+  const holder = document.getElementById('invScanHolder');
+  if(!holder) return;
+  if(!invScanning){ holder.innerHTML=''; stopScanner(); return; }
+  holder.innerHTML = `<div class="overlay" id="invScanOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Escanear QR Code</h2><button class="close" id="closeInvScan">×</button></div>
+    <div class="qr-box"><video id="scanVideo" autoplay playsinline muted></video><div class="qr-frame"></div></div>
+    <div class="note" id="scanStatus">Aponte a câmera para o QR Code do material.</div>
+    <canvas id="scanCanvas" class="hidden"></canvas>
+  </div></div>`;
+  document.getElementById('closeInvScan').onclick = ()=>{ invScanning=false; stopScanner(); renderInvScanner(); };
+  startInvScanner();
+}
+
+async function startInvScanner(){
+  try{
+    scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    const video = document.getElementById('scanVideo');
+    video.srcObject = scanStream;
+    const canvas = document.getElementById('scanCanvas');
+    const ctx = canvas.getContext('2d');
+    const tick = ()=>{
+      if(!invScanning || !scanStream) return;
+      if(video.readyState === video.HAVE_ENOUGH_DATA){
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.drawImage(video,0,0,canvas.width,canvas.height);
+        const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        if(code && code.data){
+          const p = findProdutoByCodigo(code.data);
+          invScanning=false; stopScanner(); renderInvScanner();
+          if(p){ invProdutoAtual = p; invNotFound=false; toast('Material identificado: '+p.descricao); }
+          else { invNotFound = true; toast('Código não encontrado'); }
+          renderView();
+          return;
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }catch(e){
+    const st = document.getElementById('scanStatus');
+    if(st) st.textContent = 'Não foi possível acessar a câmera.';
+  }
+}
+
+function exportInventarioPdf(){
+  if(!window.jspdf){ toast('Biblioteca de PDF não carregou. Verifique sua conexão.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16); doc.text('ERTEL — Relatório de Desvios de Inventário', 14, 16);
+  doc.setFontSize(10); doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 14, 23);
+  let y = 34;
+  doc.setFontSize(10);
+  doc.text('Código', 14, y); doc.text('Descrição', 44, y); doc.text('Sistema', 118, y); doc.text('Físico', 142, y); doc.text('Desvio', 166, y);
+  y += 5; doc.line(14, y, 196, y); y += 6;
+  invItens.forEach(it=>{
+    if(y > 280){ doc.addPage(); y = 20; }
+    const desvio = it.fisica - it.sistema;
+    doc.text(String(it.codigo).slice(0,14), 14, y);
+    doc.text(String(it.descricao).slice(0,34), 44, y);
+    doc.text(String(it.sistema), 118, y);
+    doc.text(String(it.fisica), 142, y);
+    doc.text((desvio>0?'+':'')+desvio, 166, y);
+    y += 6;
+  });
+  doc.save('relatorio-desvios-ertel.pdf');
+}
+
+function exportInventarioCsv(){
+  let csv = 'Código;Descrição;Quantidade Sistema;Quantidade Física;Desvio\n';
+  invItens.forEach(it=>{
+    const desvio = it.fisica - it.sistema;
+    csv += `${it.codigo};${it.descricao.replace(/;/g,',')};${it.sistema};${it.fisica};${desvio}\n`;
+  });
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'relatorio-desvios-ertel.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function attachCommonEvents(){
+  document.querySelectorAll('.pwd-toggle').forEach(btn=>{
+    btn.onclick = ()=>{
+      const input = document.getElementById(btn.dataset.target);
+      if(!input) return;
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.innerHTML = showing ? ICONS.eye : ICONS.eyeOff;
+    };
+  });
+}
+
+bootstrap();
+</script>
+</body>
+</html>
