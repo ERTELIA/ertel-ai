@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>ERTEL — Controle de Estoque</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSIjMEMxMjFDIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSJub25lIiBzdHJva2U9IiMzRThFRTAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM2IiBmaWxsPSIjRThBMzNEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pgo8L3N2Zz4=">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSIjMEMxMjFDIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSJub25lIiBzdHJva2U9IiMzRThFRTAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM2IiBmaWxsPSIjRThBMzNEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pgo8L3N2Zz4=">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
@@ -324,6 +326,16 @@ function isMaster(){
   const u = DB.usuarios.find(x=>x.id===(currentUser&&currentUser.id));
   return !!(u && u.master===true);
 }
+function isAdminLevel(){
+  const u = DB.usuarios.find(x=>x.id===(currentUser&&currentUser.id));
+  return !!(u && (u.master===true || u.adminLevel===true));
+}
+function roleLabel(){
+  const u = DB.usuarios.find(x=>x.id===(currentUser&&currentUser.id));
+  if(u && u.master) return 'master';
+  if(u && u.adminLevel) return 'adm';
+  return 'usuário';
+}
 
 /* ============ TOAST ============ */
 function toast(msg){
@@ -367,7 +379,7 @@ function render(){
     <div class="topbar">
       <div class="brand"><span class="tag"></span>ERTEL</div>
       <div class="sub">${rotulo} · <button class="link-btn" id="trocarModuloBtn" style="color:inherit;opacity:.85">trocar módulo</button></div>
-      <div class="userchip" id="logoutBtn">${currentUser.nome}<br>(${isMaster()?'master':'usuário'}) · sair</div>
+      <div class="userchip" id="logoutBtn">${currentUser.nome}<br>(${roleLabel()}) · sair</div>
     </div>
     <div class="view" id="viewArea"></div>
     <div class="nav">
@@ -401,13 +413,13 @@ function moduloSelectorScreen(){
     <div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">${ICONS.box} Estoque MRO</div><div class="note">Peças, materiais e manutenção geral</div></div>
-        ${isMaster() && alertasMro>0?`<span class="pill C">${alertasMro} alerta${alertasMro>1?'s':''}</span>`:''}
+        ${isAdminLevel() && alertasMro>0?`<span class="pill C">${alertasMro} alerta${alertasMro>1?'s':''}</span>`:''}
       </div>
     </div>
     <div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">🛢️ Sala de Lubrificantes</div><div class="note">Óleos e lubrificantes</div></div>
-        ${isMaster() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
+        ${isAdminLevel() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
       </div>
     </div>
 
@@ -602,7 +614,7 @@ function abcClassification(){
 }
 
 function dashboardView(){
-  if(!isMaster()){
+  if(!isAdminLevel()){
     return `<h2 class="section-title">Bem-vindo</h2>
     <div class="card">
       <div class="desc">Olá, ${currentUser.nome}!</div>
@@ -682,15 +694,19 @@ let editingProduto = null;
 let showProdutoForm = false;
 let voiceState = { listening:false, transcript:'', parsed:null };
 let pendingFotoDataUrl = '';
+let mostrarInativosProdutos = false;
 
 function produtosView(){
-  const isAdmin = isMaster();
-  const list = getProdutosArr().filter(p=>p.ativo!==false && (p.descricao.toLowerCase().includes(produtoSearch.toLowerCase()) || p.codigo.toLowerCase().includes(produtoSearch.toLowerCase())));
+  const isAdmin = isAdminLevel();
+  const list = getProdutosArr().filter(p=>(mostrarInativosProdutos || p.ativo!==false) && (p.descricao.toLowerCase().includes(produtoSearch.toLowerCase()) || p.codigo.toLowerCase().includes(produtoSearch.toLowerCase())));
 
   let html = `<h2 class="section-title">${moduloAtivo==='lub'?'Óleos':'Produtos'}</h2>`;
   html += `<div class="search"><input id="prodSearch" placeholder="Buscar por código ou descrição" value="${produtoSearch}">
     ${isAdmin?`<button class="btn btn-primary" style="width:auto;padding:11px 16px;margin:0" id="newProdBtn">+ Novo</button>`:''}
   </div>`;
+  if(isAdmin){
+    html += `<label class="remember" style="color:var(--muted);margin-bottom:12px"><input type="checkbox" id="mostrarInativosChk" ${mostrarInativosProdutos?'checked':''}> Mostrar produtos desativados</label>`;
+  }
 
   if(list.length===0){ html += `<div class="empty"><div class="icon">📦</div>Nenhum produto encontrado.</div>`; }
   list.forEach(p=>{
@@ -704,7 +720,7 @@ function produtosView(){
           </div>
           <span class="qtd ${low?'low':''}">${p.quantidade} ${p.unidade||"un"}</span>
         </div>
-        <div class="desc">${p.descricao}</div>
+        <div class="desc">${p.descricao}${p.ativo===false?' <span class="pill C">inativo</span>':''}</div>
         <div class="meta"><span>Mín: ${p.estoqueMinimo}</span>${isAdmin?`<span>${money(p.valorUnitario)}/un · Total: ${money((p.quantidade||0)*(p.valorUnitario||0))}</span>`:'<span></span>'}</div>
         ${p.endereco?`<div class="meta" style="margin-top:2px"><span>📍 ${p.endereco}</span><span></span></div>`:''}
         ${isAdmin?`<div class="row-2" style="margin-top:10px">
@@ -755,13 +771,17 @@ function produtoFormSheet(){
     <label>Estoque mínimo (alerta de recompra)</label>
     <input id="fMinimo" type="number" value="${p.estoqueMinimo}">
     <button class="btn btn-primary" id="saveProdBtn">${editingProduto?'Salvar alterações':'Confirmar cadastro'}</button>
-    ${editingProduto?`<button class="btn btn-danger" id="deactivateProdBtn">Desativar produto</button>`:''}
+    ${editingProduto?`<button class="btn btn-danger" id="deactivateProdBtn">${editingProduto.ativo===false?'Reativar produto':'Desativar produto'}</button>
+    <button class="btn btn-ghost" id="deleteProdBtn" style="border-color:var(--brick);color:var(--brick)">Excluir produto definitivamente</button>`:''}
   </div></div>`;
 }
 
 function attachProdutosEvents(){
   const s = document.getElementById('prodSearch');
   if(s) s.oninput = ()=>{ produtoSearch = s.value; renderView(); const el=document.getElementById('prodSearch'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
+
+  const mostrarInativosChk = document.getElementById('mostrarInativosChk');
+  if(mostrarInativosChk) mostrarInativosChk.onchange = ()=>{ mostrarInativosProdutos = mostrarInativosChk.checked; renderView(); };
 
   const newBtn = document.getElementById('newProdBtn');
   if(newBtn) newBtn.onclick = ()=>{ editingProduto=null; voiceState={listening:false,transcript:'',parsed:null}; pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
@@ -823,9 +843,18 @@ function attachProdutosEvents(){
 
   const deactivateBtn = document.getElementById('deactivateProdBtn');
   if(deactivateBtn) deactivateBtn.onclick = async ()=>{
-    editingProduto.ativo = false;
+    editingProduto.ativo = editingProduto.ativo===false;
     await saveAll(getProdutosKey(), getProdutosArr());
-    showProdutoForm=false; editingProduto=null; toast('Produto desativado'); renderView();
+    const msg = editingProduto.ativo===false ? 'Produto desativado' : 'Produto reativado';
+    showProdutoForm=false; editingProduto=null; toast(msg); renderView();
+  };
+
+  const deleteBtn = document.getElementById('deleteProdBtn');
+  if(deleteBtn) deleteBtn.onclick = async ()=>{
+    if(!confirm(`Excluir "${editingProduto.descricao}" definitivamente? O histórico de retiradas já feitas continua intacto (as informações ficam salvas na própria retirada), mas essa ação não pode ser desfeita.`)) return;
+    const arr = getProdutosArr().filter(p=>p.id!==editingProduto.id);
+    await setProdutosArr(arr);
+    showProdutoForm=false; editingProduto=null; toast('Produto excluído'); renderView();
   };
 
   const voiceBtn = document.getElementById('voiceBtn');
@@ -936,7 +965,7 @@ function retiradaView(){
         <button class="btn btn-ghost btn-sm" id="trocarProdBtn" style="width:auto;margin:0;padding:6px 10px;flex-shrink:0">Trocar</button>
       </div>
       <div class="meta" style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:10px">
-        <span>Disponível: ${p.quantidade} ${p.unidade||"un"}</span>${isMaster()?`<span>${money(p.valorUnitario)}/${p.unidade||"un"}</span>`:'<span></span>'}
+        <span>Disponível: ${p.quantidade} ${p.unidade||"un"}</span>${isAdminLevel()?`<span>${money(p.valorUnitario)}/${p.unidade||"un"}</span>`:'<span></span>'}
       </div>
 
       ${semEstoque?`<div class="note" style="color:var(--brick);font-weight:600;margin-top:10px">Este produto está sem estoque disponível. Não é possível confirmar a retirada.</div>`:`
@@ -993,7 +1022,8 @@ function attachRetiradaEvents(){
     const centro = DB.centros.find(c=>c.id===centroId);
     p.quantidade -= qtd;
     const retirada = {
-      id:uid(), produtoId:p.id, produtoCodigo:p.codigo, quantidadeRetirada:qtd, usuarioId:currentUser.id,
+      id:uid(), produtoId:p.id, produtoCodigo:p.codigo, produtoDescricao:p.descricao, produtoUnidade:p.unidade||'un',
+      quantidadeRetirada:qtd, usuarioId:currentUser.id,
       centroCustoId:centroId, localUsoCodigo:centro.codigo, localUsoDescricao:centro.descricao,
       ordemServico: os || '', dataHora:new Date().toISOString(), valorTotal: qtd*(p.valorUnitario||0), origem:'manual'
     };
@@ -1060,17 +1090,19 @@ function stopScanner(){
 
 /* ============ HISTÓRICO ============ */
 function historicoView(){
-  const isAdmin = isMaster();
+  const isAdmin = isAdminLevel();
   const list = getRetiradasArr().filter(r=> isAdmin || r.usuarioId===currentUser.id);
   let html = `<h2 class="section-title">Histórico de Retiradas</h2>`;
   if(list.length===0){ html += `<div class="empty"><div class="icon">🗂️</div>Nenhuma retirada registrada ainda.</div>`; return html; }
   list.forEach(r=>{
     const p = getProdutosArr().find(x=>x.id===r.produtoId);
+    const descricao = r.produtoDescricao || (p? p.descricao : '(produto removido)');
+    const unidade = r.produtoUnidade || (p? (p.unidade||'un') : 'un');
     const u = DB.usuarios.find(x=>x.id===r.usuarioId);
     const d = new Date(r.dataHora);
     html += `<div class="card">
       <div class="row1" style="display:flex;justify-content:space-between">
-        <b>${p? p.descricao : '(produto removido)'}</b><span style="font-family:var(--font-mono)">${r.quantidadeRetirada} ${p?(p.unidade||'un'):'un'}</span>
+        <b>${descricao}</b><span style="font-family:var(--font-mono)">${r.quantidadeRetirada} ${unidade}</span>
       </div>
       <div class="meta" style="font-family:var(--font-mono);font-size:11px;margin-top:2px">${r.produtoCodigo || (p?p.codigo:'')}</div>
       <div class="meta" style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;font-family:var(--font-mono)">        <span>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -1087,20 +1119,22 @@ function historicoView(){
 let maisTab = 'centros';
 function maisView(){
   const master = isMaster();
-  if(!master){
-    return `<h2 class="section-title">Mais</h2><div class="empty"><div class="icon">🔒</div>Área restrita ao administrador master.</div>`;
+  const adminLevel = isAdminLevel();
+  if(!adminLevel){
+    return `<h2 class="section-title">Mais</h2><div class="empty"><div class="icon">🔒</div>Área restrita ao administrador.</div>`;
   }
   let html = `<h2 class="section-title">Administração</h2>`;
   html += `<div class="tabs-wrap">
     <button class="btn ${maisTab==='centros'?'btn-primary':'btn-ghost'} btn-sm" id="tabCentros">Centros de Custo</button>
-    <button class="btn ${maisTab==='usuarios'?'btn-primary':'btn-ghost'} btn-sm" id="tabUsuarios">Usuários</button>
+    ${master?`<button class="btn ${maisTab==='usuarios'?'btn-primary':'btn-ghost'} btn-sm" id="tabUsuarios">Usuários</button>`:''}
     <button class="btn ${maisTab==='inventario'?'btn-primary':'btn-ghost'} btn-sm" id="tabInventario">Inventário</button>
     <button class="btn ${maisTab==='alertas'?'btn-primary':'btn-ghost'} btn-sm" id="tabAlertas">Alertas de Recompra</button>
     <button class="btn ${maisTab==='indicadores'?'btn-primary':'btn-ghost'} btn-sm" id="tabIndicadores">Indicadores</button>
     <button class="btn ${maisTab==='importexport'?'btn-primary':'btn-ghost'} btn-sm" id="tabImportExport">Importar/Exportar</button>
   </div>`;
+  if(!master && maisTab==='usuarios') maisTab = 'centros';
 
-  if(maisTab==='centros' && master){
+  if(maisTab==='centros'){
     html += `<div class="card">
       <label>Código da área</label><input id="ccCodigo" placeholder="Ex: MAN-01">
       <label>Descrição</label><input id="ccDescricao" placeholder="Ex: Manutenção — Linha 1">
@@ -1121,8 +1155,13 @@ function maisView(){
       <label>Nome</label><input id="uNome" placeholder="Nome completo">
       <label>Login</label><input id="uLogin" placeholder="Login de acesso">
       <label>Senha</label><div class="pwd-wrap"><input id="uSenha" type="password" placeholder="Senha"><button type="button" class="pwd-toggle" data-target="uSenha">${ICONS.eye}</button></div>
+      <label>Tipo de acesso</label>
+      <select id="uNivel">
+        <option value="usuario">Usuário comum (consultar estoque e retirar material)</option>
+        <option value="adm">ADM (igual ao master, exceto gerenciar senhas/usuários)</option>
+      </select>
       <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
-      <div class="note">Novo cadastro sempre entra como usuário comum, com acesso a consultar estoque e retirar material. Só existe um acesso master (administrador).</div>
+      <div class="note">Só existe um acesso master de verdade (dono das senhas). ADM tem quase tudo igual, mas não vê nem mexe em login/senha de ninguém.</div>
     </div>`;
     html += `<div class="card">
       <div class="row1"><b>WhatsApp para resumo de retiradas</b></div>
@@ -1134,9 +1173,14 @@ function maisView(){
     html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Usuários cadastrados</h2>`;
     DB.usuarios.forEach(u=>{
       html += `<div class="card">
-        <div class="row1"><b>${u.nome}</b>${u.master?' <span class="pill B">master</span>':''}${u.ativo===false?' <span class="pill C">inativo</span>':''}</div>
+        <div class="row1"><b>${u.nome}</b>${u.master?' <span class="pill B">master</span>':(u.adminLevel?' <span class="pill B">adm</span>':'')}${u.ativo===false?' <span class="pill C">inativo</span>':''}</div>
         <label>Login</label><input class="credLogin" data-id="${u.id}" value="${u.login}">
         <label>Senha</label><div class="pwd-wrap"><input class="credSenha" id="credSenha-${u.id}" data-id="${u.id}" type="password" value="${u.senha}"><button type="button" class="pwd-toggle" data-target="credSenha-${u.id}">${ICONS.eye}</button></div>
+        ${!u.master?`<label>Tipo de acesso</label>
+        <select class="credNivel" data-id="${u.id}">
+          <option value="usuario" ${!u.adminLevel?'selected':''}>Usuário comum</option>
+          <option value="adm" ${u.adminLevel?'selected':''}>ADM</option>
+        </select>`:''}
         <div class="row-2">
           <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
           <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR</button>
@@ -1152,9 +1196,9 @@ function maisView(){
     html += inventarioSection();
   } else if(maisTab==='alertas'){
     html += alertasSection();
-  } else if(maisTab==='indicadores' && master){
+  } else if(maisTab==='indicadores' ){
     html += indicadoresSection();
-  } else if(maisTab==='importexport' && master){
+  } else if(maisTab==='importexport' ){
     html += importExportSection();
   }
   return html;
@@ -1194,9 +1238,10 @@ function attachMaisEvents(){
     const nome = document.getElementById('uNome').value.trim();
     const login = document.getElementById('uLogin').value.trim();
     const senha = document.getElementById('uSenha').value.trim();
+    const nivel = document.getElementById('uNivel').value;
     if(!nome || !login || !senha){ toast('Preencha nome, login e senha'); return; }
     if(DB.usuarios.some(x=>x.login===login)){ toast('Já existe um usuário com esse login'); return; }
-    DB.usuarios.push({id:uid(), nome, perfil:'usuario', login, senha, master:false, ativo:true});
+    DB.usuarios.push({id:uid(), nome, perfil:(nivel==='adm'?'adm':'usuario'), login, senha, master:false, adminLevel:(nivel==='adm'), ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
     toast('Usuário adicionado'); renderView();
   };
@@ -1235,6 +1280,10 @@ function attachMaisEvents(){
       if(DB.usuarios.some(x=>x.login===novoLogin && x.id!==id)){ toast('Já existe um usuário com esse login'); return; }
       const u = DB.usuarios.find(x=>x.id===id);
       u.login = novoLogin; u.senha = novaSenha;
+      if(!u.master){
+        const nivelField = document.querySelector(`.credNivel[data-id="${id}"]`);
+        if(nivelField){ u.adminLevel = nivelField.value==='adm'; u.perfil = nivelField.value==='adm'?'adm':'usuario'; }
+      }
       await saveAll(KEYS.usuarios, DB.usuarios);
       toast('Credenciais atualizadas'); renderView();
     };
@@ -1496,9 +1545,9 @@ function exportRetiradasXlsx(){
       'Data': d.toLocaleDateString('pt-BR'),
       'Hora': d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),
       'Código': r.produtoCodigo || (p?p.codigo:''),
-      'Descrição': p? p.descricao : '(produto removido)',
+      'Descrição': r.produtoDescricao || (p? p.descricao : '(produto removido)'),
       'Quantidade': r.quantidadeRetirada,
-      'Unidade': p?(p.unidade||''):'',
+      'Unidade': r.produtoUnidade || (p?(p.unidade||''):''),
       'Valor Total': r.valorTotal,
       'Centro de Custo': r.localUsoCodigo+' - '+r.localUsoDescricao,
       'Ordem de Serviço': r.ordemServico||'',
