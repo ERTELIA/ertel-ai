@@ -502,6 +502,12 @@ async function attachLoginEvents(){
   const doLogin = async (login, senha)=>{
     login = (login===undefined ? document.getElementById('loginUser').value : login).trim();
     senha = (senha===undefined ? document.getElementById('loginPass').value : senha).trim();
+    const btn = document.getElementById('loginBtn');
+    if(btn){ btn.disabled = true; btn.textContent = 'Entrando...'; }
+    try{
+      DB.usuarios = await loadAll(KEYS.usuarios, DB.usuarios);
+    }catch(e){}
+    if(btn){ btn.disabled = false; btn.textContent = 'Entrar'; }
     const u = DB.usuarios.find(x=>x.login===login && x.senha===senha && x.ativo!==false);
     if(!u){ const err=document.getElementById('loginError'); if(err) err.textContent = 'Login ou senha incorretos.'; return; }
     const remember = document.getElementById('rememberChk');
