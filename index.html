@@ -243,7 +243,7 @@ window.storage = {
 };
 
 /* ============ STORAGE HELPERS ============ */
-const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub' };
+const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos' };
 
 let dbOffline = false;
 function showDbErrorBanner(msg){
@@ -286,7 +286,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[], ativos:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -305,6 +305,7 @@ async function bootstrap(){
   DB.config = await loadAll(KEYS.config, {whatsappResumo:''});
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
+  DB.ativos = await loadAll(KEYS.ativos, []);
   if(!DB.usuarios.some(u=>u.master===true)){
     DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
@@ -372,16 +373,27 @@ function render(){
     const uAtual = DB.usuarios.find(x=>x.id===currentUser.id);
     const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
     const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
+    const podeAtivos = usuarioTemAcessoModulo(uAtual, 'ativos');
     if(!uAtual || !uAtual.master){
-      if(podeMro && !podeLub){ moduloAtivo='mro'; resetModuleUiState(); }
-      else if(podeLub && !podeMro){ moduloAtivo='lub'; resetModuleUiState(); }
+      const permitidos = [podeMro&&'mro', podeLub&&'lub', podeAtivos&&'ativos'].filter(Boolean);
+      if(permitidos.length===1){ moduloAtivo=permitidos[0]; resetModuleUiState(); }
     }
   }
   if(!moduloAtivo){ app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
   const uAtualTop = DB.usuarios.find(x=>x.id===currentUser.id);
-  const temMaisDeUmModulo = uAtualTop && (uAtualTop.master || (usuarioTemAcessoModulo(uAtualTop,'mro') && usuarioTemAcessoModulo(uAtualTop,'lub')));
-  const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : 'Estoque MRO';
+  const modulosDoUsuario = uAtualTop && uAtualTop.master ? ['mro','lub','ativos'] : ['mro','lub','ativos'].filter(m=>usuarioTemAcessoModulo(uAtualTop, m));
+  const temMaisDeUmModulo = modulosDoUsuario.length > 1;
+  const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : (moduloAtivo==='ativos' ? 'Cadastro de Ativos' : 'Estoque MRO');
   const rotuloProdutos = moduloAtivo==='lub' ? 'Óleos' : 'Produtos';
+  const navButtons = moduloAtivo==='ativos'
+    ? `<button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
+       <button data-v="produtos"><span>${ICONS.box}</span>Ativos</button>
+       <button data-v="mais"><span>${ICONS.more}</span>Mais</button>`
+    : `<button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
+       <button data-v="produtos"><span>${ICONS.box}</span>${rotuloProdutos}</button>
+       <button data-v="retirada"><span>${ICONS.out}</span>Retirar</button>
+       <button data-v="historico"><span>${ICONS.hist}</span>Histórico</button>
+       <button data-v="mais"><span>${ICONS.more}</span>Mais</button>`;
   app.innerHTML = `
     <div class="topbar">
       <div class="brand"><span class="tag"></span>ERTEL</div>
@@ -390,11 +402,7 @@ function render(){
     </div>
     <div class="view" id="viewArea"></div>
     <div class="nav">
-      <button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
-      <button data-v="produtos"><span>${ICONS.box}</span>${rotuloProdutos}</button>
-      <button data-v="retirada"><span>${ICONS.out}</span>Retirar</button>
-      <button data-v="historico"><span>${ICONS.hist}</span>Histórico</button>
-      <button data-v="mais"><span>${ICONS.more}</span>Mais</button>
+      ${navButtons}
     </div>
   `;
   document.getElementById('logoutBtn').onclick = ()=>{ currentUser=null; moduloAtivo=null; try{localStorage.removeItem('ertel:session');}catch(e){} render(); };
@@ -418,6 +426,7 @@ function moduloSelectorScreen(){
   const uAtual = DB.usuarios.find(x=>x.id===currentUser.id);
   const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
   const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
+  const podeAtivos = usuarioTemAcessoModulo(uAtual, 'ativos');
   const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   return `
@@ -440,7 +449,12 @@ function moduloSelectorScreen(){
         ${isAdminLevel() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
       </div>
     </div>`:''}
-    ${(!podeMro && !podeLub)?`<div class="note" style="color:var(--brick)">Seu acesso não está liberado para nenhum módulo. Fale com o administrador master.</div>`:''}
+    ${podeAtivos?`<div class="card modSelCard" data-mod="ativos" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="desc" style="font-size:17px">⚙️ Cadastro de Ativos</div><div class="note">Máquinas, motores, redutores, bombas, esteiras</div></div>
+      </div>
+    </div>`:''}
+    ${(!podeMro && !podeLub && !podeAtivos)?`<div class="note" style="color:var(--brick)">Seu acesso não está liberado para nenhum módulo. Fale com o administrador master.</div>`:''}
 
     <button class="forgot-link" id="sairModuloBtn" style="margin-top:18px">Sair</button>
   </div></div>`;
@@ -450,6 +464,7 @@ function resetModuleUiState(){
   produtoSearch=''; editingProduto=null; showProdutoForm=false; pendingFotoDataUrl='';
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
+  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false;
 }
 
 function attachModuloSelectorEvents(){
@@ -462,6 +477,13 @@ function attachModuloSelectorEvents(){
 
 function renderView(){
   const el = document.getElementById('viewArea');
+  if(moduloAtivo==='ativos'){
+    if(currentView==='dashboard') el.innerHTML = ativosDashboardView();
+    else if(currentView==='produtos') { el.innerHTML = ativosListView(); attachAtivosEvents(); return; }
+    else if(currentView==='mais') { el.innerHTML = ativosMaisView(); attachAtivosMaisEvents(); attachCommonEvents(); return; }
+    attachCommonEvents();
+    return;
+  }
   if(currentView==='dashboard') el.innerHTML = dashboardView();
   else if(currentView==='produtos') { el.innerHTML = produtosView(); attachProdutosEvents(); return; }
   else if(currentView==='retirada') { el.innerHTML = retiradaView(); attachRetiradaEvents(); return; }
@@ -469,6 +491,363 @@ function renderView(){
   else if(currentView==='mais') { el.innerHTML = maisView(); attachMaisEvents(); attachCommonEvents(); return; }
   attachCommonEvents();
 }
+/* ============ CADASTRO DE ATIVOS ============ */
+const TIPOS_ATIVO = ['Máquina','Motor','Redutor','Bomba','Esteira','Compressor','Painel Elétrico','Outro'];
+const CRITICIDADES = [{v:'A',l:'A — Alta'},{v:'B',l:'B — Média'},{v:'C',l:'C — Baixa'}];
+const CAMPOS_COMPLETUDE_ATIVO = ['codigo','nome','tipo','fabricante','modelo','numeroSerie','placaIdentificacao','localizacao','criticidade','foto'];
+const QUICK_NA = ['Não se aplica','Sem informação'];
+const QUICK_PLACA = ['Sem placa de identificação','Placa ilegível'];
+
+function ativoCompletudePct(a){
+  let preenchidos = 0;
+  CAMPOS_COMPLETUDE_ATIVO.forEach(f=>{ if(a[f] && String(a[f]).trim()!=='') preenchidos++; });
+  return Math.round((preenchidos/CAMPOS_COMPLETUDE_ATIVO.length)*100);
+}
+
+function ativosDashboardView(){
+  const ativos = DB.ativos.filter(a=>a.ativo!==false);
+  const total = ativos.length;
+  const critCount = {A:0,B:0,C:0,'':0};
+  ativos.forEach(a=>{ critCount[a.criticidade||'']++; });
+  const classificados = total - critCount[''];
+  const pct = (n)=> total>0 ? Math.round((n/total)*100) : 0;
+  const mediaCompletude = total>0 ? Math.round(ativos.reduce((s,a)=>s+ativoCompletudePct(a),0)/total) : 0;
+  const completos = ativos.filter(a=>ativoCompletudePct(a)===100).length;
+
+  let html = `<h2 class="section-title">Painel — Ativos</h2>`;
+  html += `<div class="metrics">
+    <div class="metric"><div class="val">${total}</div><div class="lbl">Ativos cadastrados</div></div>
+    <div class="metric amber"><div class="val">${mediaCompletude}%</div><div class="lbl">Preenchimento médio</div></div>
+  </div>`;
+
+  html += `<h2 class="section-title">Criticidade ABC</h2><div class="card">
+    <div style="display:flex;justify-content:space-between;padding:6px 0"><span><span class="pill A">A</span> Alta</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.A} (${pct(critCount.A)}%)</span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill B">B</span> Média</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.B} (${pct(critCount.B)}%)</span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill C">C</span> Baixa</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.C} (${pct(critCount.C)}%)</span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span>Não classificado</span><span class="qtd" style="font-family:var(--font-mono)">${critCount['']} (${pct(critCount[''])}%)</span></div>
+  </div>`;
+
+  html += `<h2 class="section-title">Completude do Cadastro</h2><div class="card">
+    <div class="note">Cadastros 100% completos: <b>${completos}</b> de ${total}</div>
+  </div>`;
+
+  return html;
+}
+
+let ativoSearch = '';
+let editingAtivo = null;
+let showAtivoForm = false;
+let pendingFotoAtivoDataUrl = '';
+let mostrarInativosAtivos = false;
+
+function ativosListView(){
+  const isAdmin = isAdminLevel();
+  const list = DB.ativos.filter(a=>(mostrarInativosAtivos || a.ativo!==false) && ((a.nome||'').toLowerCase().includes(ativoSearch.toLowerCase()) || (a.codigo||'').toLowerCase().includes(ativoSearch.toLowerCase())));
+
+  let html = `<h2 class="section-title">Ativos</h2>`;
+  html += `<div class="search"><input id="ativoSearchInput" placeholder="Buscar por código ou nome" value="${ativoSearch}">
+    ${isAdmin?`<button class="btn btn-primary" style="width:auto;padding:11px 16px;margin:0" id="newAtivoBtn">+ Novo</button>`:''}
+  </div>`;
+  if(isAdmin){
+    html += `<label class="remember" style="color:var(--muted);margin-bottom:12px"><input type="checkbox" id="mostrarInativosAtivosChk" ${mostrarInativosAtivos?'checked':''}> Mostrar ativos desativados</label>`;
+  }
+
+  if(list.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum ativo encontrado.</div>`; }
+  list.forEach(a=>{
+    const pct = ativoCompletudePct(a);
+    html += `<div class="tag-card" data-aid="${a.id}">
+      <div class="inner">
+        <div class="row1" style="align-items:center">
+          <div style="display:flex;align-items:center;gap:9px">
+            ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+            <span class="codigo">${a.codigo||'(sem código)'}</span>
+          </div>
+          ${a.criticidade?`<span class="pill ${a.criticidade}">${a.criticidade}</span>`:''}
+        </div>
+        <div class="desc">${a.nome||'(sem nome)'}${a.ativo===false?' <span class="pill C">inativo</span>':''}</div>
+        <div class="meta"><span>${a.tipo||'—'}</span><span>${pct}% preenchido</span></div>
+        ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
+        ${isAdmin?`<div class="row-2" style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
+        </div>`:''}
+      </div>
+    </div>`;
+  });
+
+  if(showAtivoForm && isAdmin) html += ativoFormSheet();
+  return html;
+}
+
+function quickFillButtons(fieldId, opcoes){
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+    ${opcoes.map(o=>`<button type="button" class="btn btn-ghost quickFillBtn" data-field="${fieldId}" data-value="${o}" style="width:auto;margin:0;padding:5px 9px;font-size:11px">${o}</button>`).join('')}
+  </div>`;
+}
+
+function ativoFormSheet(){
+  const a = editingAtivo || {codigo:'',nome:'',tipo:'',fabricante:'',modelo:'',numeroSerie:'',placaIdentificacao:'',potencia:'',localizacao:'',criticidade:'',foto:'',observacoes:''};
+  const fotoAtual = pendingFotoAtivoDataUrl || a.foto || '';
+  return `
+  <div class="overlay" id="ativoOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingAtivo?'Editar Ativo':'Novo Ativo'}</h2><button class="close" id="closeAtivoForm">×</button></div>
+
+    <label>Foto do equipamento</label>
+    <div style="display:flex;align-items:center;gap:12px">
+      ${fotoAtual?`<img src="${fotoAtual}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+      <input type="file" accept="image/*" id="aFoto" style="flex:1">
+    </div>
+
+    <label>Código / TAG do ativo</label>
+    <input id="aCodigo" value="${a.codigo}" placeholder="Ex: MTR-001">
+    <label>Nome / Descrição</label>
+    <input id="aNome" value="${a.nome}" placeholder="Ex: Motor da esteira principal">
+    <label>Tipo</label>
+    <select id="aTipo"><option value="">Selecione...</option>${TIPOS_ATIVO.map(t=>`<option value="${t}" ${a.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
+
+    <label>Fabricante</label>
+    <input id="aFabricante" value="${a.fabricante}" placeholder="Ex: WEG">
+    ${quickFillButtons('aFabricante', QUICK_NA)}
+
+    <label>Modelo</label>
+    <input id="aModelo" value="${a.modelo}" placeholder="Ex: W22">
+    ${quickFillButtons('aModelo', QUICK_NA)}
+
+    <label>Número de série</label>
+    <input id="aNumeroSerie" value="${a.numeroSerie}" placeholder="Ex: SN123456">
+    ${quickFillButtons('aNumeroSerie', QUICK_NA)}
+
+    <label>Placa de identificação</label>
+    <input id="aPlaca" value="${a.placaIdentificacao}" placeholder="Ex: dados da placa, ou use os botões abaixo">
+    ${quickFillButtons('aPlaca', [...QUICK_PLACA, ...QUICK_NA])}
+
+    <label>Potência / Especificação técnica</label>
+    <input id="aPotencia" value="${a.potencia}" placeholder="Ex: 15 CV, 1750 RPM">
+    ${quickFillButtons('aPotencia', QUICK_NA)}
+
+    <label>Localização</label>
+    <input id="aLocalizacao" value="${a.localizacao}" placeholder="Ex: Setor produção, linha 2">
+
+    <label>Criticidade do ativo</label>
+    <select id="aCriticidade"><option value="">Não classificado</option>${CRITICIDADES.map(c=>`<option value="${c.v}" ${a.criticidade===c.v?'selected':''}>${c.l}</option>`).join('')}</select>
+
+    <label>Observações</label>
+    <textarea id="aObservacoes" rows="3" placeholder="Observações gerais">${a.observacoes||''}</textarea>
+
+    <button class="btn btn-primary" id="saveAtivoBtn">${editingAtivo?'Salvar alterações':'Confirmar cadastro'}</button>
+    ${editingAtivo?`<button class="btn btn-danger" id="deactivateAtivoBtn">${editingAtivo.ativo===false?'Reativar ativo':'Desativar ativo'}</button>
+    <button class="btn btn-ghost" id="deleteAtivoBtn" style="border-color:var(--brick);color:var(--brick)">Excluir ativo definitivamente</button>`:''}
+  </div></div>`;
+}
+
+function attachAtivosEvents(){
+  const s = document.getElementById('ativoSearchInput');
+  if(s) s.oninput = ()=>{ ativoSearch = s.value; renderView(); const el=document.getElementById('ativoSearchInput'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
+
+  const mostrarInativosChk = document.getElementById('mostrarInativosAtivosChk');
+  if(mostrarInativosChk) mostrarInativosChk.onchange = ()=>{ mostrarInativosAtivos = mostrarInativosChk.checked; renderView(); };
+
+  const newBtn = document.getElementById('newAtivoBtn');
+  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+
+  document.querySelectorAll('.editAtivo').forEach(b=>{
+    b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+  });
+
+  const closeBtn = document.getElementById('closeAtivoForm');
+  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; pendingFotoAtivoDataUrl=''; renderView(); };
+
+  document.querySelectorAll('.quickFillBtn').forEach(b=>{
+    b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
+  });
+
+  const fotoInput = document.getElementById('aFoto');
+  if(fotoInput) fotoInput.onchange = (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxSize = 360;
+        let w = img.width, h = img.height;
+        if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
+        else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        pendingFotoAtivoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        renderView();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveBtn = document.getElementById('saveAtivoBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    const codigo = document.getElementById('aCodigo').value.trim();
+    const nome = document.getElementById('aNome').value.trim();
+    if(!codigo || !nome){ toast('Preencha ao menos código e nome'); return; }
+    if(DB.ativos.some(a=>a.codigo.toLowerCase()===codigo.toLowerCase() && (!editingAtivo || a.id!==editingAtivo.id))){
+      toast('Já existe um ativo cadastrado com esse código'); return;
+    }
+    const dados = {
+      codigo, nome,
+      tipo: document.getElementById('aTipo').value,
+      fabricante: document.getElementById('aFabricante').value.trim(),
+      modelo: document.getElementById('aModelo').value.trim(),
+      numeroSerie: document.getElementById('aNumeroSerie').value.trim(),
+      placaIdentificacao: document.getElementById('aPlaca').value.trim(),
+      potencia: document.getElementById('aPotencia').value.trim(),
+      localizacao: document.getElementById('aLocalizacao').value.trim(),
+      criticidade: document.getElementById('aCriticidade').value,
+      observacoes: document.getElementById('aObservacoes').value.trim(),
+      foto: pendingFotoAtivoDataUrl || (editingAtivo ? editingAtivo.foto : '') || ''
+    };
+    if(editingAtivo){ Object.assign(editingAtivo, dados); }
+    else { DB.ativos.push({id:uid(), ...dados, ativo:true, dataCadastro:new Date().toISOString()}); }
+    await saveAll(KEYS.ativos, DB.ativos);
+    showAtivoForm=false; editingAtivo=null; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
+  };
+
+  const deactivateBtn = document.getElementById('deactivateAtivoBtn');
+  if(deactivateBtn) deactivateBtn.onclick = async ()=>{
+    editingAtivo.ativo = editingAtivo.ativo===false;
+    await saveAll(KEYS.ativos, DB.ativos);
+    const msg = editingAtivo.ativo===false ? 'Ativo desativado' : 'Ativo reativado';
+    showAtivoForm=false; editingAtivo=null; toast(msg); renderView();
+  };
+
+  const deleteBtn = document.getElementById('deleteAtivoBtn');
+  if(deleteBtn) deleteBtn.onclick = async ()=>{
+    if(!confirm(`Excluir "${editingAtivo.nome}" definitivamente? Essa ação não pode ser desfeita.`)) return;
+    DB.ativos = DB.ativos.filter(a=>a.id!==editingAtivo.id);
+    await saveAll(KEYS.ativos, DB.ativos);
+    showAtivoForm=false; editingAtivo=null; toast('Ativo excluído'); renderView();
+  };
+}
+
+/* ---- Importar / Exportar Ativos ---- */
+const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Potência','Localização','Criticidade (A/B/C)'];
+let exportAtivosBusy = false;
+
+function ativosMaisView(){
+  let html = `<h2 class="section-title">Importar Planilha de Ativos</h2>
+  <div class="card">
+    <div class="note">Importa uma lista de equipamentos em Excel (.xlsx) ou CSV para cadastrar ativos em massa.</div>
+    <button class="btn btn-primary btn-sm" id="importarAtivosBtn">Importar planilha</button>
+    <input type="file" id="importAtivosFileInput" accept=".xlsx,.xls,.csv" class="hidden">
+  </div>
+
+  <h2 class="section-title" style="margin-top:20px">Extrair Dados (Excel)</h2>
+  <div class="card">
+    <div class="note">Lista completa dos ativos cadastrados, com todas as informações preenchidas.</div>
+    <button class="btn btn-outline btn-sm" id="exportAtivosBtn">Exportar ativos cadastrados</button>
+  </div>
+
+  <div id="importAtivosFormatModalHolder"></div>`;
+  return html;
+}
+
+function attachAtivosMaisEvents(){
+  const importarBtn = document.getElementById('importarAtivosBtn');
+  if(importarBtn) importarBtn.onclick = showImportAtivosFormatModal;
+
+  const fileInput = document.getElementById('importAtivosFileInput');
+  if(fileInput) fileInput.onchange = handleImportAtivosFile;
+
+  const exportBtn = document.getElementById('exportAtivosBtn');
+  if(exportBtn) exportBtn.onclick = exportAtivosXlsx;
+}
+
+function showImportAtivosFormatModal(){
+  const holder = document.getElementById('importAtivosFormatModalHolder');
+  holder.innerHTML = `<div class="overlay" id="importAtivosFormatOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Formato da Planilha</h2><button class="close" id="closeImportAtivosFormat">×</button></div>
+    <div class="note">A primeira linha deve ser o cabeçalho. As colunas devem seguir exatamente esta ordem:</div>
+    <div class="card">
+      <table class="abc"><tr>${FORMATO_COLUNAS_ATIVOS.map(c=>`<th>${c}</th>`).join('')}</tr>
+      <tr>${['MTR-001','Motor esteira 1','Motor','WEG','W22','SN123456','Ver placa','15 CV','Linha 2','A'].map(v=>`<td>${v}</td>`).join('')}</tr></table>
+    </div>
+    <div class="note">Se algum código já existir, o app vai perguntar se você quer atualizar com os dados da planilha.</div>
+    <button class="btn btn-primary" id="continuarImportAtivosBtn">Continuar e escolher o arquivo</button>
+  </div></div>`;
+  document.getElementById('closeImportAtivosFormat').onclick = ()=>{ holder.innerHTML=''; };
+  document.getElementById('continuarImportAtivosBtn').onclick = ()=>{
+    holder.innerHTML='';
+    document.getElementById('importAtivosFileInput').click();
+  };
+}
+
+function handleImportAtivosFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou. Verifique sua conexão.'); return; }
+  const reader = new FileReader();
+  reader.onload = async (ev)=>{
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      const dataRows = rows.slice(1).filter(r=>r && r[0] !== '' && r[0] !== undefined);
+      if(dataRows.length===0){ toast('Nenhum dado encontrado na planilha'); return; }
+
+      let novos=0, atualizados=0, ignorados=0;
+
+      for(const row of dataRows){
+        const codigo = String(row[0]||'').trim();
+        const nome = String(row[1]||'').trim();
+        const tipo = String(row[2]||'').trim();
+        const fabricante = String(row[3]||'').trim();
+        const modelo = String(row[4]||'').trim();
+        const numeroSerie = String(row[5]||'').trim();
+        const placaIdentificacao = String(row[6]||'').trim();
+        const potencia = String(row[7]||'').trim();
+        const localizacao = String(row[8]||'').trim();
+        const criticidade = String(row[9]||'').trim().toUpperCase();
+        if(!codigo || !nome) continue;
+
+        const existente = DB.ativos.find(a=>a.codigo.toLowerCase()===codigo.toLowerCase());
+        if(!existente){
+          DB.ativos.push({id:uid(), codigo, nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:''), observacoes:'', foto:'', ativo:true, dataCadastro:new Date().toISOString()});
+          novos++;
+        } else {
+          const msg = `O ativo "${codigo}" já existe:\n\nCadastro atual: ${existente.nome}\nNa planilha: ${nome}\n\nDeseja atualizar o cadastro com os dados da planilha?`;
+          if(confirm(msg)){
+            Object.assign(existente, {nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:existente.criticidade)});
+            atualizados++;
+          } else { ignorados++; }
+        }
+      }
+      await saveAll(KEYS.ativos, DB.ativos);
+      toast(`Importação concluída: ${novos} novos, ${atualizados} atualizados, ${ignorados} ignorados`);
+      renderView();
+    }catch(err){
+      console.error(err);
+      toast('Não foi possível ler a planilha. Verifique o formato do arquivo.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportAtivosXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const arr = DB.ativos.filter(a=>a.ativo!==false);
+  if(arr.length===0){ toast('Nenhum ativo cadastrado'); return; }
+  const rows = arr.map(a=>({
+    'Código': a.codigo, 'Nome': a.nome, 'Tipo': a.tipo||'', 'Fabricante': a.fabricante||'',
+    'Modelo': a.modelo||'', 'Número de Série': a.numeroSerie||'', 'Placa de Identificação': a.placaIdentificacao||'',
+    'Potência': a.potencia||'', 'Localização': a.localizacao||'', 'Criticidade': a.criticidade||'',
+    'Observações': a.observacoes||'', '% Preenchimento': ativoCompletudePct(a)+'%'
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ativos');
+  XLSX.writeFile(wb, `ativos-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function codigoJaExisteEmOutroModulo(codigo, ignorarId){
   const c = codigo.toLowerCase();
   const emMro = DB.produtos.find(p=>p.codigo.toLowerCase()===c && p.id!==ignorarId);
@@ -1130,6 +1509,7 @@ function maisView(){
       <label>Módulos liberados</label>
       <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModMro" checked> Estoque MRO</label>
       <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModLub"> Sala de Lubrificantes</label>
+      <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModAtivos"> Cadastro de Ativos</label>
       <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
       <div class="note">Só existe um acesso master de verdade (dono das senhas). ADM tem quase tudo igual, mas não vê nem mexe em login/senha de ninguém. Marque pelo menos um módulo.</div>
     </div>`;
@@ -1153,7 +1533,8 @@ function maisView(){
         </select>
         <label>Módulos liberados</label>
         <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModMro" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'mro')?'checked':''}> Estoque MRO</label>
-        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModLub" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'lub')?'checked':''}> Sala de Lubrificantes</label>`:''}
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModLub" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'lub')?'checked':''}> Sala de Lubrificantes</label>
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModAtivos" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'ativos')?'checked':''}> Cadastro de Ativos</label>`:''}
         <div class="row-2">
           <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
           <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR</button>
@@ -1215,6 +1596,7 @@ function attachMaisEvents(){
     const modulos = [];
     if(document.getElementById('uModMro').checked) modulos.push('mro');
     if(document.getElementById('uModLub').checked) modulos.push('lub');
+    if(document.getElementById('uModAtivos').checked) modulos.push('ativos');
     if(!nome || !login || !senha){ toast('Preencha nome, login e senha'); return; }
     if(modulos.length===0){ toast('Marque pelo menos um módulo (MRO ou Lubrificantes)'); return; }
     if(DB.usuarios.some(x=>x.login===login)){ toast('Já existe um usuário com esse login'); return; }
@@ -1262,10 +1644,12 @@ function attachMaisEvents(){
         if(nivelField){ u.adminLevel = nivelField.value==='adm'; u.perfil = nivelField.value==='adm'?'adm':'usuario'; }
         const modMroField = document.querySelector(`.credModMro[data-id="${id}"]`);
         const modLubField = document.querySelector(`.credModLub[data-id="${id}"]`);
+        const modAtivosField = document.querySelector(`.credModAtivos[data-id="${id}"]`);
         if(modMroField && modLubField){
           const modulos = [];
           if(modMroField.checked) modulos.push('mro');
           if(modLubField.checked) modulos.push('lub');
+          if(modAtivosField && modAtivosField.checked) modulos.push('ativos');
           if(modulos.length===0){ toast('Marque pelo menos um módulo para este usuário'); return; }
           u.modulos = modulos;
         }
