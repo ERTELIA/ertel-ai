@@ -464,7 +464,7 @@ function resetModuleUiState(){
   produtoSearch=''; editingProduto=null; showProdutoForm=false; pendingFotoDataUrl='';
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
-  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId='';
+  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
 }
 
 function attachModuloSelectorEvents(){
@@ -492,7 +492,78 @@ function renderView(){
   attachCommonEvents();
 }
 /* ============ CADASTRO DE ATIVOS ============ */
-const TIPOS_ATIVO = ['Máquina','Motor','Redutor','Bomba','Esteira','Compressor','Painel Elétrico','Outro'];
+const TIPOS_ATIVO = ['Máquina','Motor','Motoredutor','Motobomba','Redutor','Bomba','Esteira','Compressor','Painel Elétrico','Outro'];
+
+/* Campos técnicos por tipo — baseado em placas de identificação padrão (NBR 17094 / WEG)
+   e catálogos técnicos de bombas, redutores e transportadores de correia. */
+const MOTOR_FIELDS = [
+  {id:'potenciaCv', label:'Potência (CV/kW)', ph:'Ex: 15 CV (11 kW)'},
+  {id:'tensaoV', label:'Tensão nominal (V)', ph:'Ex: 220/380V'},
+  {id:'correnteA', label:'Corrente nominal (A)', ph:'Ex: 24,4 A'},
+  {id:'frequenciaHz', label:'Frequência (Hz)', ph:'Ex: 60 Hz'},
+  {id:'rotacaoRpm', label:'Rotação nominal (RPM)', ph:'Ex: 1750 RPM'},
+  {id:'numPolos', label:'Número de polos', ph:'Ex: 4'},
+  {id:'carcaca', label:'Carcaça (frame)', ph:'Ex: 132S'},
+  {id:'grauProtecao', label:'Grau de proteção (IP)', ph:'Ex: IP55'},
+  {id:'classeIsolamento', label:'Classe de isolamento', ph:'Ex: F'},
+  {id:'fatorServico', label:'Fator de serviço (FS)', ph:'Ex: 1.15'},
+  {id:'rendimento', label:'Rendimento (%)', ph:'Ex: 92,5%'},
+  {id:'fatorPotencia', label:'Fator de potência (cos φ)', ph:'Ex: 0,87'},
+  {id:'regimeServico', label:'Regime de serviço', ph:'Ex: S1 - Contínuo'},
+  {id:'pesoKg', label:'Peso (kg)', ph:'Ex: 65 kg'},
+];
+const REDUTOR_FIELDS = [
+  {id:'relacaoReducao', label:'Relação de redução (i)', ph:'Ex: 1:20'},
+  {id:'torqueSaidaNm', label:'Torque de saída (Nm)', ph:'Ex: 450 Nm'},
+  {id:'rotacaoEntradaRpm', label:'Rotação de entrada (RPM)', ph:'Ex: 1750 RPM'},
+  {id:'rotacaoSaidaRpm', label:'Rotação de saída (RPM)', ph:'Ex: 87 RPM'},
+  {id:'tipoRedutor', label:'Tipo de redutor', ph:'Ex: Sem-fim/coroa, Helicoidal, Planetário'},
+  {id:'tipoMontagem', label:'Tipo de montagem', ph:'Ex: Eixo vazado, Flangeado, Pé'},
+  {id:'sentidoRotacao', label:'Sentido de rotação', ph:'Ex: Horário'},
+  {id:'oleoLubrificante', label:'Óleo lubrificante recomendado', ph:'Ex: ISO VG 220'},
+  {id:'quantidadeOleo', label:'Quantidade de óleo (litros)', ph:'Ex: 2,5 L'},
+];
+const MOTOREDUTOR_FIELDS = [...MOTOR_FIELDS, ...REDUTOR_FIELDS];
+const MOTOBOMBA_FIELDS = [
+  {id:'potenciaCv', label:'Potência do motor (CV/kW)', ph:'Ex: 10 CV'},
+  {id:'tensaoV', label:'Tensão nominal (V)', ph:'Ex: 220/380V'},
+  {id:'correnteA', label:'Corrente nominal (A)', ph:'Ex: 18 A'},
+  {id:'rotacaoRpm', label:'Rotação (RPM)', ph:'Ex: 3500 RPM'},
+  {id:'tipoBomba', label:'Tipo de bomba', ph:'Ex: Centrífuga, Autoescorvante, Submersa'},
+  {id:'vazao', label:'Vazão (m³/h)', ph:'Ex: 12 m³/h'},
+  {id:'alturaManometrica', label:'Altura manométrica (mca)', ph:'Ex: 30 mca'},
+  {id:'diametroSuccao', label:'Diâmetro de sucção', ph:'Ex: 2"'},
+  {id:'diametroRecalque', label:'Diâmetro de recalque', ph:'Ex: 1.1/2"'},
+  {id:'materialCarcaca', label:'Material da carcaça', ph:'Ex: Ferro fundido'},
+  {id:'materialRotor', label:'Material do rotor', ph:'Ex: Bronze'},
+  {id:'tipoSeloMecanico', label:'Tipo de selo mecânico', ph:'Ex: Cerâmica/Carbono'},
+  {id:'fluidoBombeado', label:'Fluido bombeado', ph:'Ex: Água, óleo, produto químico'},
+  {id:'temperaturaTrabalho', label:'Temperatura de trabalho (°C)', ph:'Ex: até 60°C'},
+  {id:'pressaoMaxima', label:'Pressão máxima de trabalho (bar)', ph:'Ex: 6 bar'},
+];
+const ESTEIRA_FIELDS = [
+  {id:'comprimento', label:'Comprimento (m)', ph:'Ex: 12 m'},
+  {id:'larguraCorreia', label:'Largura da correia (mm)', ph:'Ex: 500 mm'},
+  {id:'velocidade', label:'Velocidade (m/min)', ph:'Ex: 30 m/min'},
+  {id:'capacidadeTransporte', label:'Capacidade de transporte (t/h)', ph:'Ex: 50 t/h'},
+  {id:'tipoCorreia', label:'Tipo/material da correia', ph:'Ex: Borracha, PVC, lona'},
+  {id:'inclinacao', label:'Inclinação (°)', ph:'Ex: 15°'},
+  {id:'potenciaAcionamento', label:'Potência do motor de acionamento', ph:'Ex: 5 CV'},
+  {id:'tipoRolete', label:'Tipo de rolete', ph:'Ex: Rolete de carga/retorno'},
+];
+const MAQUINA_FIELDS = [
+  {id:'funcao', label:'Função / Finalidade', ph:'Ex: Corte de chapas metálicas'},
+  {id:'anoFabricacao', label:'Ano de fabricação', ph:'Ex: 2018'},
+  {id:'capacidadeProducao', label:'Capacidade de produção', ph:'Ex: 200 peças/hora'},
+  {id:'dimensoes', label:'Dimensões (C x L x A)', ph:'Ex: 3,0 x 1,2 x 1,8 m'},
+  {id:'tensaoAlimentacao', label:'Tensão de alimentação', ph:'Ex: 380V trifásico'},
+  {id:'potenciaInstalada', label:'Potência instalada', ph:'Ex: 25 CV'},
+];
+const TIPO_CAMPOS_ESPECIFICOS = {
+  'Motor': MOTOR_FIELDS, 'Motoredutor': MOTOREDUTOR_FIELDS, 'Redutor': REDUTOR_FIELDS,
+  'Motobomba': MOTOBOMBA_FIELDS, 'Bomba': MOTOBOMBA_FIELDS, 'Esteira': ESTEIRA_FIELDS,
+  'Máquina': MAQUINA_FIELDS, 'Compressor': MAQUINA_FIELDS, 'Painel Elétrico': MAQUINA_FIELDS, 'Outro': MAQUINA_FIELDS
+};
 const CRITICIDADES = [{v:'A',l:'A — Alta'},{v:'B',l:'B — Média'},{v:'C',l:'C — Baixa'}];
 const CAMPOS_COMPLETUDE_ATIVO = ['codigo','nome','tipo','fabricante','modelo','numeroSerie','placaIdentificacao','localizacao','criticidade','foto'];
 const QUICK_NA = ['Não se aplica','Sem informação'];
@@ -501,7 +572,11 @@ const QUICK_PLACA = ['Sem placa de identificação','Placa ilegível'];
 function ativoCompletudePct(a){
   let preenchidos = 0;
   CAMPOS_COMPLETUDE_ATIVO.forEach(f=>{ if(a[f] && String(a[f]).trim()!=='') preenchidos++; });
-  return Math.round((preenchidos/CAMPOS_COMPLETUDE_ATIVO.length)*100);
+  const especificos = (a.tipo && TIPO_CAMPOS_ESPECIFICOS[a.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[a.tipo] : [];
+  const campos = a.campos || {};
+  especificos.forEach(f=>{ if(campos[f.id] && String(campos[f.id]).trim()!=='') preenchidos++; });
+  const total = CAMPOS_COMPLETUDE_ATIVO.length + especificos.length;
+  return total>0 ? Math.round((preenchidos/total)*100) : 0;
 }
 
 function ativosDashboardView(){
@@ -540,6 +615,35 @@ let showAtivoForm = false;
 let pendingFotoAtivoDataUrl = '';
 let mostrarInativosAtivos = false;
 let prefillAtivoPaiId = '';
+let ativoFormDraft = null;
+
+function initAtivoFormDraft(base){
+  return {
+    codigo: base.codigo||'', nome: base.nome||'', tipo: base.tipo||'',
+    ativoPaiId: base.ativoPaiId||prefillAtivoPaiId||'',
+    fabricante: base.fabricante||'', modelo: base.modelo||'', numeroSerie: base.numeroSerie||'',
+    placaIdentificacao: base.placaIdentificacao||'', localizacao: base.localizacao||'',
+    criticidade: base.criticidade||'', observacoes: base.observacoes||'', foto: base.foto||'',
+    campos: {...(base.campos||{})}
+  };
+}
+
+function captureAtivoFormValues(){
+  if(!ativoFormDraft) return;
+  const g = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if(g('aCodigo')!==undefined) ativoFormDraft.codigo = g('aCodigo').trim();
+  if(g('aNome')!==undefined) ativoFormDraft.nome = g('aNome').trim();
+  if(g('aAtivoPai')!==undefined) ativoFormDraft.ativoPaiId = g('aAtivoPai');
+  if(g('aFabricante')!==undefined) ativoFormDraft.fabricante = g('aFabricante').trim();
+  if(g('aModelo')!==undefined) ativoFormDraft.modelo = g('aModelo').trim();
+  if(g('aNumeroSerie')!==undefined) ativoFormDraft.numeroSerie = g('aNumeroSerie').trim();
+  if(g('aPlaca')!==undefined) ativoFormDraft.placaIdentificacao = g('aPlaca').trim();
+  if(g('aLocalizacao')!==undefined) ativoFormDraft.localizacao = g('aLocalizacao').trim();
+  if(g('aCriticidade')!==undefined) ativoFormDraft.criticidade = g('aCriticidade');
+  if(g('aObservacoes')!==undefined) ativoFormDraft.observacoes = g('aObservacoes').trim();
+  const especificos = (ativoFormDraft.tipo && TIPO_CAMPOS_ESPECIFICOS[ativoFormDraft.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[ativoFormDraft.tipo] : [];
+  especificos.forEach(f=>{ const v = g('campo-'+f.id); if(v!==undefined) ativoFormDraft.campos[f.id] = v.trim(); });
+}
 let visualizacaoArvoreAtivos = true;
 
 function getDescendentesIds(ativoId){
@@ -607,10 +711,13 @@ function quickFillButtons(fieldId, opcoes){
 }
 
 function ativoFormSheet(){
-  const a = editingAtivo || {codigo:'',nome:'',tipo:'',fabricante:'',modelo:'',numeroSerie:'',placaIdentificacao:'',potencia:'',localizacao:'',criticidade:'',foto:'',observacoes:'',ativoPaiId: prefillAtivoPaiId||''};
+  if(!ativoFormDraft) ativoFormDraft = initAtivoFormDraft(editingAtivo || {});
+  const a = ativoFormDraft;
   const fotoAtual = pendingFotoAtivoDataUrl || a.foto || '';
   const descendentesIds = editingAtivo ? getDescendentesIds(editingAtivo.id) : [];
   const opcoesPai = DB.ativos.filter(x=>x.ativo!==false && (!editingAtivo || (x.id!==editingAtivo.id && !descendentesIds.includes(x.id))));
+  const especificos = (a.tipo && TIPO_CAMPOS_ESPECIFICOS[a.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[a.tipo] : [];
+
   return `
   <div class="overlay" id="ativoOverlay"><div class="sheet">
     <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingAtivo?'Editar Ativo':(a.ativoPaiId?'Novo Ativo Filho':'Novo Ativo')}</h2><button class="close" id="closeAtivoForm">×</button></div>
@@ -625,8 +732,10 @@ function ativoFormSheet(){
     <input id="aCodigo" value="${a.codigo}" placeholder="Ex: MTR-001">
     <label>Nome / Descrição</label>
     <input id="aNome" value="${a.nome}" placeholder="Ex: Motor da esteira principal">
-    <label>Tipo</label>
+
+    <label>Tipo de equipamento</label>
     <select id="aTipo"><option value="">Selecione...</option>${TIPOS_ATIVO.map(t=>`<option value="${t}" ${a.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
+    <div class="note">${a.tipo? 'Os campos técnicos abaixo foram ajustados para '+a.tipo+'.' : 'Escolha o tipo para ver os campos técnicos específicos dele.'}</div>
 
     <label>Ativo pai (opcional — deixe em branco se for um ativo raiz/independente)</label>
     <select id="aAtivoPai"><option value="">Nenhum — ativo independente</option>${opcoesPai.map(p=>`<option value="${p.id}" ${a.ativoPaiId===p.id?'selected':''}>${p.codigo} — ${p.nome}</option>`).join('')}</select>
@@ -648,11 +757,14 @@ function ativoFormSheet(){
     <input id="aPlaca" value="${a.placaIdentificacao}" placeholder="Ex: dados da placa, ou use os botões abaixo">
     ${quickFillButtons('aPlaca', [...QUICK_PLACA, ...QUICK_NA])}
 
-    <label>Potência / Especificação técnica</label>
-    <input id="aPotencia" value="${a.potencia}" placeholder="Ex: 15 CV, 1750 RPM">
-    ${quickFillButtons('aPotencia', QUICK_NA)}
+    ${especificos.length>0?`<h2 class="section-title" style="font-size:15px;margin-top:16px">Dados técnicos — ${a.tipo}</h2>`:''}
+    ${especificos.map(f=>`
+      <label>${f.label}</label>
+      <input id="campo-${f.id}" value="${(a.campos&&a.campos[f.id])||''}" placeholder="${f.ph}">
+      ${quickFillButtons('campo-'+f.id, QUICK_NA)}
+    `).join('')}
 
-    <label>Localização</label>
+    <label style="margin-top:16px">Localização</label>
     <input id="aLocalizacao" value="${a.localizacao}" placeholder="Ex: Setor produção, linha 2">
 
     <label>Criticidade do ativo</label>
@@ -678,18 +790,25 @@ function attachAtivosEvents(){
   if(arvoreChk) arvoreChk.onchange = ()=>{ visualizacaoArvoreAtivos = arvoreChk.checked; renderView(); };
 
   const newBtn = document.getElementById('newAtivoBtn');
-  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
 
   document.querySelectorAll('.editAtivo').forEach(b=>{
-    b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+    b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
 
   document.querySelectorAll('.addFilhoAtivo').forEach(b=>{
-    b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+    b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
 
   const closeBtn = document.getElementById('closeAtivoForm');
-  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; renderView(); };
+  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; renderView(); };
+
+  const tipoSelect = document.getElementById('aTipo');
+  if(tipoSelect) tipoSelect.onchange = ()=>{
+    captureAtivoFormValues();
+    ativoFormDraft.tipo = tipoSelect.value;
+    renderView();
+  };
 
   document.querySelectorAll('.quickFillBtn').forEach(b=>{
     b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
@@ -711,6 +830,7 @@ function attachAtivosEvents(){
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         pendingFotoAtivoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        captureAtivoFormValues();
         renderView();
       };
       img.src = ev.target.result;
@@ -720,30 +840,31 @@ function attachAtivosEvents(){
 
   const saveBtn = document.getElementById('saveAtivoBtn');
   if(saveBtn) saveBtn.onclick = async ()=>{
-    const codigo = document.getElementById('aCodigo').value.trim();
-    const nome = document.getElementById('aNome').value.trim();
+    captureAtivoFormValues();
+    const codigo = ativoFormDraft.codigo;
+    const nome = ativoFormDraft.nome;
     if(!codigo || !nome){ toast('Preencha ao menos código e nome'); return; }
     if(DB.ativos.some(a=>a.codigo.toLowerCase()===codigo.toLowerCase() && (!editingAtivo || a.id!==editingAtivo.id))){
       toast('Já existe um ativo cadastrado com esse código'); return;
     }
     const dados = {
       codigo, nome,
-      tipo: document.getElementById('aTipo').value,
-      ativoPaiId: document.getElementById('aAtivoPai').value,
-      fabricante: document.getElementById('aFabricante').value.trim(),
-      modelo: document.getElementById('aModelo').value.trim(),
-      numeroSerie: document.getElementById('aNumeroSerie').value.trim(),
-      placaIdentificacao: document.getElementById('aPlaca').value.trim(),
-      potencia: document.getElementById('aPotencia').value.trim(),
-      localizacao: document.getElementById('aLocalizacao').value.trim(),
-      criticidade: document.getElementById('aCriticidade').value,
-      observacoes: document.getElementById('aObservacoes').value.trim(),
+      tipo: ativoFormDraft.tipo,
+      ativoPaiId: ativoFormDraft.ativoPaiId,
+      fabricante: ativoFormDraft.fabricante,
+      modelo: ativoFormDraft.modelo,
+      numeroSerie: ativoFormDraft.numeroSerie,
+      placaIdentificacao: ativoFormDraft.placaIdentificacao,
+      localizacao: ativoFormDraft.localizacao,
+      criticidade: ativoFormDraft.criticidade,
+      observacoes: ativoFormDraft.observacoes,
+      campos: {...ativoFormDraft.campos},
       foto: pendingFotoAtivoDataUrl || (editingAtivo ? editingAtivo.foto : '') || ''
     };
     if(editingAtivo){ Object.assign(editingAtivo, dados); }
     else { DB.ativos.push({id:uid(), ...dados, ativo:true, dataCadastro:new Date().toISOString()}); }
     await saveAll(KEYS.ativos, DB.ativos);
-    showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
+    showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
   };
 
   const deactivateBtn = document.getElementById('deactivateAtivoBtn');
@@ -751,7 +872,7 @@ function attachAtivosEvents(){
     editingAtivo.ativo = editingAtivo.ativo===false;
     await saveAll(KEYS.ativos, DB.ativos);
     const msg = editingAtivo.ativo===false ? 'Ativo desativado' : 'Ativo reativado';
-    showAtivoForm=false; editingAtivo=null; toast(msg); renderView();
+    showAtivoForm=false; editingAtivo=null; ativoFormDraft=null; toast(msg); renderView();
   };
 
   const deleteBtn = document.getElementById('deleteAtivoBtn');
@@ -759,12 +880,12 @@ function attachAtivosEvents(){
     if(!confirm(`Excluir "${editingAtivo.nome}" definitivamente? Essa ação não pode ser desfeita.`)) return;
     DB.ativos = DB.ativos.filter(a=>a.id!==editingAtivo.id);
     await saveAll(KEYS.ativos, DB.ativos);
-    showAtivoForm=false; editingAtivo=null; toast('Ativo excluído'); renderView();
+    showAtivoForm=false; editingAtivo=null; ativoFormDraft=null; toast('Ativo excluído'); renderView();
   };
 }
 
 /* ---- Importar / Exportar Ativos ---- */
-const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Potência','Localização','Criticidade (A/B/C)','Código do Ativo Pai (opcional)'];
+const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Localização','Criticidade (A/B/C)','Código do Ativo Pai (opcional)'];
 let exportAtivosBusy = false;
 
 function ativosMaisView(){
@@ -807,7 +928,7 @@ function showImportAtivosFormatModal(){
     <div class="note">A primeira linha deve ser o cabeçalho. As colunas devem seguir exatamente esta ordem:</div>
     <div class="card">
       <table class="abc"><tr>${FORMATO_COLUNAS_ATIVOS.map(c=>`<th>${c}</th>`).join('')}</tr>
-      <tr>${['MTR-001','Motor esteira 1','Motor','WEG','W22','SN123456','Ver placa','15 CV','Linha 2','A',''].map(v=>`<td>${v}</td>`).join('')}</tr></table>
+      <tr>${['MTR-001','Motor esteira 1','Motor','WEG','W22','SN123456','Ver placa','Linha 2','A',''].map(v=>`<td>${v}</td>`).join('')}</tr></table>
     </div>
     <div class="note">A última coluna (ativo pai) é opcional: preencha com o <b>código</b> de outro ativo da mesma planilha (ou já cadastrado) se este for um ativo filho — por exemplo, um motor ligado a uma esteira. Deixe em branco se for um ativo independente.</div>
     <div class="note">Se algum código já existir, o app vai perguntar se você quer atualizar com os dados da planilha.</div>
@@ -845,21 +966,20 @@ function handleImportAtivosFile(e){
         const modelo = String(row[4]||'').trim();
         const numeroSerie = String(row[5]||'').trim();
         const placaIdentificacao = String(row[6]||'').trim();
-        const potencia = String(row[7]||'').trim();
-        const localizacao = String(row[8]||'').trim();
-        const criticidade = String(row[9]||'').trim().toUpperCase();
-        const codigoPai = String(row[10]||'').trim();
+        const localizacao = String(row[7]||'').trim();
+        const criticidade = String(row[8]||'').trim().toUpperCase();
+        const codigoPai = String(row[9]||'').trim();
         if(!codigo || !nome) continue;
         if(codigoPai) paiPorCodigo[codigo.toLowerCase()] = codigoPai;
 
         const existente = DB.ativos.find(a=>a.codigo.toLowerCase()===codigo.toLowerCase());
         if(!existente){
-          DB.ativos.push({id:uid(), codigo, nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:''), ativoPaiId:'', observacoes:'', foto:'', ativo:true, dataCadastro:new Date().toISOString()});
+          DB.ativos.push({id:uid(), codigo, nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:''), ativoPaiId:'', observacoes:'', foto:'', campos:{}, ativo:true, dataCadastro:new Date().toISOString()});
           novos++;
         } else {
           const msg = `O ativo "${codigo}" já existe:\n\nCadastro atual: ${existente.nome}\nNa planilha: ${nome}\n\nDeseja atualizar o cadastro com os dados da planilha?`;
           if(confirm(msg)){
-            Object.assign(existente, {nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:existente.criticidade)});
+            Object.assign(existente, {nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:existente.criticidade)});
             atualizados++;
           } else { ignorados++; }
         }
@@ -889,10 +1009,13 @@ function exportAtivosXlsx(incluirHierarquia){
   const arr = DB.ativos.filter(a=>a.ativo!==false);
   if(arr.length===0){ toast('Nenhum ativo cadastrado'); return; }
   const rows = arr.map(a=>{
+    const especificos = (a.tipo && TIPO_CAMPOS_ESPECIFICOS[a.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[a.tipo] : [];
+    const campos = a.campos || {};
+    const dadosTecnicos = especificos.filter(f=>campos[f.id] && String(campos[f.id]).trim()!=='').map(f=>`${f.label}: ${campos[f.id]}`).join(' | ');
     const row = {
       'Código': a.codigo, 'Nome': a.nome, 'Tipo': a.tipo||'', 'Fabricante': a.fabricante||'',
       'Modelo': a.modelo||'', 'Número de Série': a.numeroSerie||'', 'Placa de Identificação': a.placaIdentificacao||'',
-      'Potência': a.potencia||'', 'Localização': a.localizacao||'', 'Criticidade': a.criticidade||'',
+      'Dados Técnicos': dadosTecnicos, 'Localização': a.localizacao||'', 'Criticidade': a.criticidade||'',
       'Observações': a.observacoes||'', '% Preenchimento': ativoCompletudePct(a)+'%'
     };
     if(incluirHierarquia){
