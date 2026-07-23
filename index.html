@@ -173,9 +173,6 @@
   .qr-box video{width:100%;height:100%;object-fit:cover;}
   .qr-frame{position:absolute;inset:15%;border:2.5px solid var(--amber);border-radius:8px;}
 
-  .mic-btn{width:64px;height:64px;border-radius:50%;background:var(--amber);border:none;display:flex;align-items:center;justify-content:center;margin:14px auto;cursor:pointer;}
-  .mic-btn.listening{background:var(--brick);animation:pulse 1.2s infinite;}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(179,63,63,.5);}100%{box-shadow:0 0 0 16px rgba(179,63,63,0);}}
 
   .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:#1B2230;border:1px solid rgba(255,255,255,.12);color:var(--white);padding:11px 18px;border-radius:30px;font-size:13px;z-index:100;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);}
   .note{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;}
@@ -352,7 +349,6 @@ const ICONS = {
   out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>',
   hist:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 106 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>',
-  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="#1B1D1F" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><path d="M12 19v4"/></svg>',
   qr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.94 10.94 0 0112 20c-7 0-11-8-11-8a19.86 19.86 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 8 11 8a19.86 19.86 0 01-3.22 4.44"/><path d="M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>',
@@ -372,13 +368,24 @@ const ICONS = {
 function render(){
   const app = document.getElementById('app');
   if(!currentUser){ app.innerHTML = loginScreen(); attachLoginEvents(); return; }
+  if(!moduloAtivo){
+    const uAtual = DB.usuarios.find(x=>x.id===currentUser.id);
+    const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
+    const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
+    if(!uAtual || !uAtual.master){
+      if(podeMro && !podeLub){ moduloAtivo='mro'; resetModuleUiState(); }
+      else if(podeLub && !podeMro){ moduloAtivo='lub'; resetModuleUiState(); }
+    }
+  }
   if(!moduloAtivo){ app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
+  const uAtualTop = DB.usuarios.find(x=>x.id===currentUser.id);
+  const temMaisDeUmModulo = uAtualTop && (uAtualTop.master || (usuarioTemAcessoModulo(uAtualTop,'mro') && usuarioTemAcessoModulo(uAtualTop,'lub')));
   const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : 'Estoque MRO';
   const rotuloProdutos = moduloAtivo==='lub' ? 'Óleos' : 'Produtos';
   app.innerHTML = `
     <div class="topbar">
       <div class="brand"><span class="tag"></span>ERTEL</div>
-      <div class="sub">${rotulo} · <button class="link-btn" id="trocarModuloBtn" style="color:inherit;opacity:.85">trocar módulo</button></div>
+      <div class="sub">${rotulo}${temMaisDeUmModulo?` · <button class="link-btn" id="trocarModuloBtn" style="color:inherit;opacity:.85">trocar módulo</button>`:''}</div>
       <div class="userchip" id="logoutBtn">${currentUser.nome}<br>(${roleLabel()}) · sair</div>
     </div>
     <div class="view" id="viewArea"></div>
@@ -391,7 +398,8 @@ function render(){
     </div>
   `;
   document.getElementById('logoutBtn').onclick = ()=>{ currentUser=null; moduloAtivo=null; try{localStorage.removeItem('ertel:session');}catch(e){} render(); };
-  document.getElementById('trocarModuloBtn').onclick = (e)=>{ e.stopPropagation(); moduloAtivo=null; currentView='dashboard'; render(); };
+  const trocarBtn = document.getElementById('trocarModuloBtn');
+  if(trocarBtn) trocarBtn.onclick = (e)=>{ e.stopPropagation(); moduloAtivo=null; currentView='dashboard'; render(); };
   document.querySelectorAll('.nav button').forEach(b=>{
     b.onclick = ()=>{ currentView=b.dataset.v; render(); };
     if(b.dataset.v===currentView) b.classList.add('active');
@@ -399,7 +407,17 @@ function render(){
   renderView();
 }
 
+function usuarioTemAcessoModulo(u, modulo){
+  if(!u) return false;
+  if(u.master) return true;
+  if(!u.modulos || !Array.isArray(u.modulos)) return true; // usuários antigos sem essa config: mantém acesso a tudo
+  return u.modulos.includes(modulo);
+}
+
 function moduloSelectorScreen(){
+  const uAtual = DB.usuarios.find(x=>x.id===currentUser.id);
+  const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
+  const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
   const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   return `
@@ -410,18 +428,19 @@ function moduloSelectorScreen(){
     </div>
     <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
 
-    <div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+    ${podeMro?`<div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">${ICONS.box} Estoque MRO</div><div class="note">Peças, materiais e manutenção geral</div></div>
         ${isAdminLevel() && alertasMro>0?`<span class="pill C">${alertasMro} alerta${alertasMro>1?'s':''}</span>`:''}
       </div>
-    </div>
-    <div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+    </div>`:''}
+    ${podeLub?`<div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">🛢️ Sala de Lubrificantes</div><div class="note">Óleos e lubrificantes</div></div>
         ${isAdminLevel() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
       </div>
-    </div>
+    </div>`:''}
+    ${(!podeMro && !podeLub)?`<div class="note" style="color:var(--brick)">Seu acesso não está liberado para nenhum módulo. Fale com o administrador master.</div>`:''}
 
     <button class="forgot-link" id="sairModuloBtn" style="margin-top:18px">Sair</button>
   </div></div>`;
@@ -624,7 +643,7 @@ function dashboardView(){
 
   const produtosAtivos = getProdutosArr().filter(p=>p.ativo!==false);
   const valorTotal = produtosAtivos.reduce((s,p)=>s+(p.quantidade||0)*(p.valorUnitario||0),0);
-  const qtdTotal = produtosAtivos.reduce((s,p)=>s+(p.quantidade||0),0);
+  const qtdTotal = produtosAtivos.length;
   const alertas = produtosAtivos.filter(p=>(p.quantidade||0) <= (p.estoqueMinimo||0));
   const mesAtual = today();
   const consumoMes = getRetiradasArr().filter(r=>sameMonth(r.dataHora, mesAtual)).reduce((s,r)=>s+(r.valorTotal||0),0);
@@ -651,7 +670,7 @@ function dashboardView(){
 
   let html = `<h2 class="section-title">Painel Geral</h2>`;
   html += `<div class="metrics">
-    <div class="metric"><div class="val">${qtdTotal}</div><div class="lbl">Itens em estoque</div></div>
+    <div class="metric"><div class="val">${qtdTotal}</div><div class="lbl">Total de produtos ativos</div></div>
     <div class="metric"><div class="val" style="font-size:19px">${money(valorTotal)}</div><div class="lbl">Valor total estoque</div></div>
     <div class="metric amber"><div class="val">${alertas.length}</div><div class="lbl">Alertas recompra</div></div>
     <div class="metric" style="background:var(--moss)"><div class="val" style="font-size:17px">${money(consumoMes)}</div><div class="lbl">Consumido no mês</div></div>
@@ -692,7 +711,6 @@ function dashboardView(){
 let produtoSearch = '';
 let editingProduto = null;
 let showProdutoForm = false;
-let voiceState = { listening:false, transcript:'', parsed:null };
 let pendingFotoDataUrl = '';
 let mostrarInativosProdutos = false;
 
@@ -746,10 +764,6 @@ function produtoFormSheet(){
   <div class="overlay" id="prodOverlay"><div class="sheet">
     <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingProduto?(moduloAtivo==='lub'?'Editar Óleo':'Editar Produto'):(moduloAtivo==='lub'?'Novo Óleo':'Novo Produto')}</h2><button class="close" id="closeProdForm">×</button></div>
 
-    <button class="mic-btn ${voiceState.listening?'listening':''}" id="voiceBtn" title="Cadastrar por voz">${ICONS.mic}</button>
-    <div class="note" style="text-align:center">${voiceState.listening?'Ouvindo... fale o cadastro do material':'Toque no microfone para cadastrar por voz (ex: "cadastra parafuso M8, código PF1234, 50 unidades, 2 reais cada, mínimo 10")'}</div>
-    ${voiceState.transcript?`<div class="note" style="background:var(--paper-2);padding:8px;border-radius:6px;margin-top:8px"><b>Transcrição:</b> ${voiceState.transcript}</div>`:''}
-
     <label>Foto do produto</label>
     <div style="display:flex;align-items:center;gap:12px">
       ${fotoAtual?`<img src="${fotoAtual}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
@@ -784,7 +798,7 @@ function attachProdutosEvents(){
   if(mostrarInativosChk) mostrarInativosChk.onchange = ()=>{ mostrarInativosProdutos = mostrarInativosChk.checked; renderView(); };
 
   const newBtn = document.getElementById('newProdBtn');
-  if(newBtn) newBtn.onclick = ()=>{ editingProduto=null; voiceState={listening:false,transcript:'',parsed:null}; pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
+  if(newBtn) newBtn.onclick = ()=>{ editingProduto=null; pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
 
   document.querySelectorAll('.editProd').forEach(b=>{
     b.onclick = ()=>{ editingProduto = getProdutosArr().find(p=>p.id===b.dataset.id); pendingFotoDataUrl=''; showProdutoForm=true; renderView(); };
@@ -857,8 +871,6 @@ function attachProdutosEvents(){
     showProdutoForm=false; editingProduto=null; toast('Produto excluído'); renderView();
   };
 
-  const voiceBtn = document.getElementById('voiceBtn');
-  if(voiceBtn) voiceBtn.onclick = startVoiceCapture;
 }
 
 function showQrModal(pid){
@@ -873,51 +885,6 @@ function showQrModal(pid){
   document.getElementById('closeQr').onclick = ()=>{ holder.innerHTML=''; };
   try{ new QRCode(document.getElementById('qrCanvasWrap'), {text:p.codigo, width:180, height:180}); }
   catch(e){ document.getElementById('qrCanvasWrap').innerHTML = `<div class="note">Código: <b>${p.codigo}</b></div>`; }
-}
-
-/* ---- Voice capture + Claude API parsing ---- */
-function startVoiceCapture(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ toast('Reconhecimento de voz não suportado neste navegador'); return; }
-  const rec = new SR();
-  rec.lang = 'pt-BR'; rec.interimResults = false; rec.maxAlternatives = 1;
-  voiceState.listening = true; renderView();
-  rec.onresult = async (e)=>{
-    const transcript = e.results[0][0].transcript;
-    voiceState.listening = false; voiceState.transcript = transcript;
-    renderView();
-    await parseVoiceToFields(transcript);
-  };
-  rec.onerror = ()=>{ voiceState.listening=false; toast('Não entendi, tente novamente'); renderView(); };
-  rec.onend = ()=>{ if(voiceState.listening){ voiceState.listening=false; renderView(); } };
-  rec.start();
-}
-
-async function parseVoiceToFields(transcript){
-  try{
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:300,
-        system:'Você extrai dados de cadastro de material de estoque a partir de uma fala em português. Responda APENAS com um JSON puro (sem markdown, sem texto extra) no formato: {"codigo":"","descricao":"","quantidade":0,"valorUnitario":0,"estoqueMinimo":0}. Se algum campo não for mencionado, use 0 para números ou "" para texto.',
-        messages:[{role:'user', content: transcript}]
-      })
-    });
-    const data = await resp.json();
-    const text = (data.content||[]).map(b=>b.text||'').join('');
-    const clean = text.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-    if(document.getElementById('fCodigo')) document.getElementById('fCodigo').value = parsed.codigo || '';
-    if(document.getElementById('fDescricao')) document.getElementById('fDescricao').value = parsed.descricao || '';
-    if(document.getElementById('fQuantidade')) document.getElementById('fQuantidade').value = parsed.quantidade || 0;
-    if(document.getElementById('fValor')) document.getElementById('fValor').value = parsed.valorUnitario || 0;
-    if(document.getElementById('fMinimo')) document.getElementById('fMinimo').value = parsed.estoqueMinimo || 0;
-    toast('Campos preenchidos — revise e confirme');
-  }catch(e){
-    console.error(e); toast('Não consegui interpretar o áudio, preencha manualmente');
-  }
 }
 
 /* ============ RETIRADA ============ */
@@ -1160,8 +1127,11 @@ function maisView(){
         <option value="usuario">Usuário comum (consultar estoque e retirar material)</option>
         <option value="adm">ADM (igual ao master, exceto gerenciar senhas/usuários)</option>
       </select>
+      <label>Módulos liberados</label>
+      <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModMro" checked> Estoque MRO</label>
+      <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModLub"> Sala de Lubrificantes</label>
       <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
-      <div class="note">Só existe um acesso master de verdade (dono das senhas). ADM tem quase tudo igual, mas não vê nem mexe em login/senha de ninguém.</div>
+      <div class="note">Só existe um acesso master de verdade (dono das senhas). ADM tem quase tudo igual, mas não vê nem mexe em login/senha de ninguém. Marque pelo menos um módulo.</div>
     </div>`;
     html += `<div class="card">
       <div class="row1"><b>WhatsApp para resumo de retiradas</b></div>
@@ -1180,7 +1150,10 @@ function maisView(){
         <select class="credNivel" data-id="${u.id}">
           <option value="usuario" ${!u.adminLevel?'selected':''}>Usuário comum</option>
           <option value="adm" ${u.adminLevel?'selected':''}>ADM</option>
-        </select>`:''}
+        </select>
+        <label>Módulos liberados</label>
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModMro" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'mro')?'checked':''}> Estoque MRO</label>
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModLub" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'lub')?'checked':''}> Sala de Lubrificantes</label>`:''}
         <div class="row-2">
           <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
           <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR</button>
@@ -1239,9 +1212,13 @@ function attachMaisEvents(){
     const login = document.getElementById('uLogin').value.trim();
     const senha = document.getElementById('uSenha').value.trim();
     const nivel = document.getElementById('uNivel').value;
+    const modulos = [];
+    if(document.getElementById('uModMro').checked) modulos.push('mro');
+    if(document.getElementById('uModLub').checked) modulos.push('lub');
     if(!nome || !login || !senha){ toast('Preencha nome, login e senha'); return; }
+    if(modulos.length===0){ toast('Marque pelo menos um módulo (MRO ou Lubrificantes)'); return; }
     if(DB.usuarios.some(x=>x.login===login)){ toast('Já existe um usuário com esse login'); return; }
-    DB.usuarios.push({id:uid(), nome, perfil:(nivel==='adm'?'adm':'usuario'), login, senha, master:false, adminLevel:(nivel==='adm'), ativo:true});
+    DB.usuarios.push({id:uid(), nome, perfil:(nivel==='adm'?'adm':'usuario'), login, senha, master:false, adminLevel:(nivel==='adm'), modulos, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
     toast('Usuário adicionado'); renderView();
   };
@@ -1283,6 +1260,15 @@ function attachMaisEvents(){
       if(!u.master){
         const nivelField = document.querySelector(`.credNivel[data-id="${id}"]`);
         if(nivelField){ u.adminLevel = nivelField.value==='adm'; u.perfil = nivelField.value==='adm'?'adm':'usuario'; }
+        const modMroField = document.querySelector(`.credModMro[data-id="${id}"]`);
+        const modLubField = document.querySelector(`.credModLub[data-id="${id}"]`);
+        if(modMroField && modLubField){
+          const modulos = [];
+          if(modMroField.checked) modulos.push('mro');
+          if(modLubField.checked) modulos.push('lub');
+          if(modulos.length===0){ toast('Marque pelo menos um módulo para este usuário'); return; }
+          u.modulos = modulos;
+        }
       }
       await saveAll(KEYS.usuarios, DB.usuarios);
       toast('Credenciais atualizadas'); renderView();
