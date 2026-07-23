@@ -464,7 +464,7 @@ function resetModuleUiState(){
   produtoSearch=''; editingProduto=null; showProdutoForm=false; pendingFotoDataUrl='';
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
-  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false;
+  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId='';
 }
 
 function attachModuloSelectorEvents(){
@@ -539,26 +539,39 @@ let editingAtivo = null;
 let showAtivoForm = false;
 let pendingFotoAtivoDataUrl = '';
 let mostrarInativosAtivos = false;
+let prefillAtivoPaiId = '';
+let visualizacaoArvoreAtivos = true;
+
+function getDescendentesIds(ativoId){
+  const filhosDiretos = DB.ativos.filter(a=>a.ativoPaiId===ativoId).map(a=>a.id);
+  let todos = [...filhosDiretos];
+  filhosDiretos.forEach(fid=>{ todos = todos.concat(getDescendentesIds(fid)); });
+  return todos;
+}
 
 function ativosListView(){
   const isAdmin = isAdminLevel();
+  const buscaAtiva = ativoSearch.trim()!=='';
   const list = DB.ativos.filter(a=>(mostrarInativosAtivos || a.ativo!==false) && ((a.nome||'').toLowerCase().includes(ativoSearch.toLowerCase()) || (a.codigo||'').toLowerCase().includes(ativoSearch.toLowerCase())));
 
   let html = `<h2 class="section-title">Ativos</h2>`;
   html += `<div class="search"><input id="ativoSearchInput" placeholder="Buscar por código ou nome" value="${ativoSearch}">
     ${isAdmin?`<button class="btn btn-primary" style="width:auto;padding:11px 16px;margin:0" id="newAtivoBtn">+ Novo</button>`:''}
   </div>`;
-  if(isAdmin){
-    html += `<label class="remember" style="color:var(--muted);margin-bottom:12px"><input type="checkbox" id="mostrarInativosAtivosChk" ${mostrarInativosAtivos?'checked':''}> Mostrar ativos desativados</label>`;
-  }
+  html += `<div class="row-2" style="margin-bottom:10px">
+    <label class="remember" style="color:var(--muted)"><input type="checkbox" id="arvoreChk" ${visualizacaoArvoreAtivos?'checked':''}> Visualização em árvore (pai/filho)</label>
+    ${isAdmin?`<label class="remember" style="color:var(--muted)"><input type="checkbox" id="mostrarInativosAtivosChk" ${mostrarInativosAtivos?'checked':''}> Mostrar desativados</label>`:''}
+  </div>`;
 
-  if(list.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum ativo encontrado.</div>`; }
-  list.forEach(a=>{
+  function cardAtivo(a, nivel){
     const pct = ativoCompletudePct(a);
-    html += `<div class="tag-card" data-aid="${a.id}">
+    const filhos = (visualizacaoArvoreAtivos && !buscaAtiva) ? DB.ativos.filter(x=>x.ativoPaiId===a.id && (mostrarInativosAtivos || x.ativo!==false)) : [];
+    const pai = a.ativoPaiId ? DB.ativos.find(x=>x.id===a.ativoPaiId) : null;
+    let h = `<div class="tag-card" data-aid="${a.id}" style="margin-left:${nivel*18}px">
       <div class="inner">
         <div class="row1" style="align-items:center">
           <div style="display:flex;align-items:center;gap:9px">
+            ${nivel>0?'<span style="color:var(--muted)">↳</span>':''}
             ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
             <span class="codigo">${a.codigo||'(sem código)'}</span>
           </div>
@@ -567,12 +580,21 @@ function ativosListView(){
         <div class="desc">${a.nome||'(sem nome)'}${a.ativo===false?' <span class="pill C">inativo</span>':''}</div>
         <div class="meta"><span>${a.tipo||'—'}</span><span>${pct}% preenchido</span></div>
         ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
+        ${pai && (buscaAtiva || !visualizacaoArvoreAtivos)?`<div class="note">Filho de: ${pai.codigo} — ${pai.nome}</div>`:''}
+        ${filhos.length>0?`<div class="note">${filhos.length} ativo${filhos.length>1?'s':''} filho${filhos.length>1?'s':''}</div>`:''}
         ${isAdmin?`<div class="row-2" style="margin-top:10px">
           <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
+          <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${a.id}">+ Adicionar filho</button>
         </div>`:''}
       </div>
     </div>`;
-  });
+    filhos.forEach(f=>{ h += cardAtivo(f, nivel+1); });
+    return h;
+  }
+
+  if(list.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum ativo encontrado.</div>`; }
+  const raizes = (visualizacaoArvoreAtivos && !buscaAtiva) ? list.filter(a=>!a.ativoPaiId || !list.some(x=>x.id===a.ativoPaiId)) : list;
+  raizes.forEach(a=>{ html += cardAtivo(a, 0); });
 
   if(showAtivoForm && isAdmin) html += ativoFormSheet();
   return html;
@@ -585,11 +607,13 @@ function quickFillButtons(fieldId, opcoes){
 }
 
 function ativoFormSheet(){
-  const a = editingAtivo || {codigo:'',nome:'',tipo:'',fabricante:'',modelo:'',numeroSerie:'',placaIdentificacao:'',potencia:'',localizacao:'',criticidade:'',foto:'',observacoes:''};
+  const a = editingAtivo || {codigo:'',nome:'',tipo:'',fabricante:'',modelo:'',numeroSerie:'',placaIdentificacao:'',potencia:'',localizacao:'',criticidade:'',foto:'',observacoes:'',ativoPaiId: prefillAtivoPaiId||''};
   const fotoAtual = pendingFotoAtivoDataUrl || a.foto || '';
+  const descendentesIds = editingAtivo ? getDescendentesIds(editingAtivo.id) : [];
+  const opcoesPai = DB.ativos.filter(x=>x.ativo!==false && (!editingAtivo || (x.id!==editingAtivo.id && !descendentesIds.includes(x.id))));
   return `
   <div class="overlay" id="ativoOverlay"><div class="sheet">
-    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingAtivo?'Editar Ativo':'Novo Ativo'}</h2><button class="close" id="closeAtivoForm">×</button></div>
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingAtivo?'Editar Ativo':(a.ativoPaiId?'Novo Ativo Filho':'Novo Ativo')}</h2><button class="close" id="closeAtivoForm">×</button></div>
 
     <label>Foto do equipamento</label>
     <div style="display:flex;align-items:center;gap:12px">
@@ -603,6 +627,10 @@ function ativoFormSheet(){
     <input id="aNome" value="${a.nome}" placeholder="Ex: Motor da esteira principal">
     <label>Tipo</label>
     <select id="aTipo"><option value="">Selecione...</option>${TIPOS_ATIVO.map(t=>`<option value="${t}" ${a.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
+
+    <label>Ativo pai (opcional — deixe em branco se for um ativo raiz/independente)</label>
+    <select id="aAtivoPai"><option value="">Nenhum — ativo independente</option>${opcoesPai.map(p=>`<option value="${p.id}" ${a.ativoPaiId===p.id?'selected':''}>${p.codigo} — ${p.nome}</option>`).join('')}</select>
+    <div class="note">Use isso para ligar um motor, motobomba ou motoredutor a um equipamento maior (o "pai").</div>
 
     <label>Fabricante</label>
     <input id="aFabricante" value="${a.fabricante}" placeholder="Ex: WEG">
@@ -646,15 +674,22 @@ function attachAtivosEvents(){
   const mostrarInativosChk = document.getElementById('mostrarInativosAtivosChk');
   if(mostrarInativosChk) mostrarInativosChk.onchange = ()=>{ mostrarInativosAtivos = mostrarInativosChk.checked; renderView(); };
 
+  const arvoreChk = document.getElementById('arvoreChk');
+  if(arvoreChk) arvoreChk.onchange = ()=>{ visualizacaoArvoreAtivos = arvoreChk.checked; renderView(); };
+
   const newBtn = document.getElementById('newAtivoBtn');
-  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
 
   document.querySelectorAll('.editAtivo').forEach(b=>{
     b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
 
+  document.querySelectorAll('.addFilhoAtivo').forEach(b=>{
+    b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+  });
+
   const closeBtn = document.getElementById('closeAtivoForm');
-  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; pendingFotoAtivoDataUrl=''; renderView(); };
+  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; renderView(); };
 
   document.querySelectorAll('.quickFillBtn').forEach(b=>{
     b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
@@ -694,6 +729,7 @@ function attachAtivosEvents(){
     const dados = {
       codigo, nome,
       tipo: document.getElementById('aTipo').value,
+      ativoPaiId: document.getElementById('aAtivoPai').value,
       fabricante: document.getElementById('aFabricante').value.trim(),
       modelo: document.getElementById('aModelo').value.trim(),
       numeroSerie: document.getElementById('aNumeroSerie').value.trim(),
@@ -707,7 +743,7 @@ function attachAtivosEvents(){
     if(editingAtivo){ Object.assign(editingAtivo, dados); }
     else { DB.ativos.push({id:uid(), ...dados, ativo:true, dataCadastro:new Date().toISOString()}); }
     await saveAll(KEYS.ativos, DB.ativos);
-    showAtivoForm=false; editingAtivo=null; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
+    showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
   };
 
   const deactivateBtn = document.getElementById('deactivateAtivoBtn');
@@ -728,13 +764,13 @@ function attachAtivosEvents(){
 }
 
 /* ---- Importar / Exportar Ativos ---- */
-const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Potência','Localização','Criticidade (A/B/C)'];
+const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Potência','Localização','Criticidade (A/B/C)','Código do Ativo Pai (opcional)'];
 let exportAtivosBusy = false;
 
 function ativosMaisView(){
   let html = `<h2 class="section-title">Importar Planilha de Ativos</h2>
   <div class="card">
-    <div class="note">Importa uma lista de equipamentos em Excel (.xlsx) ou CSV para cadastrar ativos em massa.</div>
+    <div class="note">Importa uma lista de equipamentos em Excel (.xlsx) ou CSV para cadastrar ativos em massa. A coluna de ativo pai é opcional — deixe em branco se o ativo não tiver um "pai".</div>
     <button class="btn btn-primary btn-sm" id="importarAtivosBtn">Importar planilha</button>
     <input type="file" id="importAtivosFileInput" accept=".xlsx,.xls,.csv" class="hidden">
   </div>
@@ -742,6 +778,7 @@ function ativosMaisView(){
   <h2 class="section-title" style="margin-top:20px">Extrair Dados (Excel)</h2>
   <div class="card">
     <div class="note">Lista completa dos ativos cadastrados, com todas as informações preenchidas.</div>
+    <label class="remember" style="color:var(--ink);margin:8px 0"><input type="checkbox" id="incluirHierarquiaExportChk"> Incluir hierarquia (código do ativo pai) na exportação</label>
     <button class="btn btn-outline btn-sm" id="exportAtivosBtn">Exportar ativos cadastrados</button>
   </div>
 
@@ -757,7 +794,10 @@ function attachAtivosMaisEvents(){
   if(fileInput) fileInput.onchange = handleImportAtivosFile;
 
   const exportBtn = document.getElementById('exportAtivosBtn');
-  if(exportBtn) exportBtn.onclick = exportAtivosXlsx;
+  if(exportBtn) exportBtn.onclick = ()=>{
+    const incluirHierarquia = document.getElementById('incluirHierarquiaExportChk').checked;
+    exportAtivosXlsx(incluirHierarquia);
+  };
 }
 
 function showImportAtivosFormatModal(){
@@ -767,8 +807,9 @@ function showImportAtivosFormatModal(){
     <div class="note">A primeira linha deve ser o cabeçalho. As colunas devem seguir exatamente esta ordem:</div>
     <div class="card">
       <table class="abc"><tr>${FORMATO_COLUNAS_ATIVOS.map(c=>`<th>${c}</th>`).join('')}</tr>
-      <tr>${['MTR-001','Motor esteira 1','Motor','WEG','W22','SN123456','Ver placa','15 CV','Linha 2','A'].map(v=>`<td>${v}</td>`).join('')}</tr></table>
+      <tr>${['MTR-001','Motor esteira 1','Motor','WEG','W22','SN123456','Ver placa','15 CV','Linha 2','A',''].map(v=>`<td>${v}</td>`).join('')}</tr></table>
     </div>
+    <div class="note">A última coluna (ativo pai) é opcional: preencha com o <b>código</b> de outro ativo da mesma planilha (ou já cadastrado) se este for um ativo filho — por exemplo, um motor ligado a uma esteira. Deixe em branco se for um ativo independente.</div>
     <div class="note">Se algum código já existir, o app vai perguntar se você quer atualizar com os dados da planilha.</div>
     <button class="btn btn-primary" id="continuarImportAtivosBtn">Continuar e escolher o arquivo</button>
   </div></div>`;
@@ -794,6 +835,7 @@ function handleImportAtivosFile(e){
       if(dataRows.length===0){ toast('Nenhum dado encontrado na planilha'); return; }
 
       let novos=0, atualizados=0, ignorados=0;
+      const paiPorCodigo = {}; // codigo do filho (lowercase) -> codigo do pai informado na planilha
 
       for(const row of dataRows){
         const codigo = String(row[0]||'').trim();
@@ -806,11 +848,13 @@ function handleImportAtivosFile(e){
         const potencia = String(row[7]||'').trim();
         const localizacao = String(row[8]||'').trim();
         const criticidade = String(row[9]||'').trim().toUpperCase();
+        const codigoPai = String(row[10]||'').trim();
         if(!codigo || !nome) continue;
+        if(codigoPai) paiPorCodigo[codigo.toLowerCase()] = codigoPai;
 
         const existente = DB.ativos.find(a=>a.codigo.toLowerCase()===codigo.toLowerCase());
         if(!existente){
-          DB.ativos.push({id:uid(), codigo, nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:''), observacoes:'', foto:'', ativo:true, dataCadastro:new Date().toISOString()});
+          DB.ativos.push({id:uid(), codigo, nome, tipo, fabricante, modelo, numeroSerie, placaIdentificacao, potencia, localizacao, criticidade:(['A','B','C'].includes(criticidade)?criticidade:''), ativoPaiId:'', observacoes:'', foto:'', ativo:true, dataCadastro:new Date().toISOString()});
           novos++;
         } else {
           const msg = `O ativo "${codigo}" já existe:\n\nCadastro atual: ${existente.nome}\nNa planilha: ${nome}\n\nDeseja atualizar o cadastro com os dados da planilha?`;
@@ -820,8 +864,16 @@ function handleImportAtivosFile(e){
           } else { ignorados++; }
         }
       }
+
+      let vinculados = 0;
+      Object.keys(paiPorCodigo).forEach(codFilhoLower=>{
+        const filho = DB.ativos.find(a=>a.codigo.toLowerCase()===codFilhoLower);
+        const pai = DB.ativos.find(a=>a.codigo.toLowerCase()===paiPorCodigo[codFilhoLower].toLowerCase());
+        if(filho && pai && pai.id!==filho.id){ filho.ativoPaiId = pai.id; vinculados++; }
+      });
+
       await saveAll(KEYS.ativos, DB.ativos);
-      toast(`Importação concluída: ${novos} novos, ${atualizados} atualizados, ${ignorados} ignorados`);
+      toast(`Importação concluída: ${novos} novos, ${atualizados} atualizados, ${ignorados} ignorados, ${vinculados} vínculos de hierarquia`);
       renderView();
     }catch(err){
       console.error(err);
@@ -832,16 +884,23 @@ function handleImportAtivosFile(e){
   reader.readAsArrayBuffer(file);
 }
 
-function exportAtivosXlsx(){
+function exportAtivosXlsx(incluirHierarquia){
   if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
   const arr = DB.ativos.filter(a=>a.ativo!==false);
   if(arr.length===0){ toast('Nenhum ativo cadastrado'); return; }
-  const rows = arr.map(a=>({
-    'Código': a.codigo, 'Nome': a.nome, 'Tipo': a.tipo||'', 'Fabricante': a.fabricante||'',
-    'Modelo': a.modelo||'', 'Número de Série': a.numeroSerie||'', 'Placa de Identificação': a.placaIdentificacao||'',
-    'Potência': a.potencia||'', 'Localização': a.localizacao||'', 'Criticidade': a.criticidade||'',
-    'Observações': a.observacoes||'', '% Preenchimento': ativoCompletudePct(a)+'%'
-  }));
+  const rows = arr.map(a=>{
+    const row = {
+      'Código': a.codigo, 'Nome': a.nome, 'Tipo': a.tipo||'', 'Fabricante': a.fabricante||'',
+      'Modelo': a.modelo||'', 'Número de Série': a.numeroSerie||'', 'Placa de Identificação': a.placaIdentificacao||'',
+      'Potência': a.potencia||'', 'Localização': a.localizacao||'', 'Criticidade': a.criticidade||'',
+      'Observações': a.observacoes||'', '% Preenchimento': ativoCompletudePct(a)+'%'
+    };
+    if(incluirHierarquia){
+      const pai = a.ativoPaiId ? DB.ativos.find(x=>x.id===a.ativoPaiId) : null;
+      row['Código do Ativo Pai'] = pai ? pai.codigo : '';
+    }
+    return row;
+  });
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Ativos');
