@@ -8,8 +8,8 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSIjMEMxMjFDIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSJub25lIiBzdHJva2U9IiMzRThFRTAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM2IiBmaWxsPSIjRThBMzNEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pgo8L3N2Zz4=">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';document.head.appendChild(s);"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js';document.head.appendChild(s);"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -105,6 +105,11 @@
   .search input{flex:1;}
   .tabs-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
   .tabs-wrap button{flex:0 0 auto;width:auto;margin-top:0;padding:8px 13px;}
+  .barchart-row{display:flex;align-items:center;gap:8px;margin:7px 0;}
+  .barchart-label{width:118px;font-size:11px;color:var(--muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .barchart-track{flex:1;background:var(--paper-2);border-radius:4px;height:18px;position:relative;overflow:hidden;}
+  .barchart-fill{height:100%;background:linear-gradient(90deg,#2E6FBE,#4C97E6);border-radius:4px;}
+  .barchart-value{width:60px;text-align:right;font-family:var(--font-mono);font-size:11px;flex-shrink:0;}
 
   .empty{text-align:center;padding:40px 16px;color:var(--muted);}
   .empty .icon{font-size:34px;margin-bottom:8px;}
@@ -243,7 +248,7 @@ window.storage = {
 };
 
 /* ============ STORAGE HELPERS ============ */
-const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos' };
+const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos', ativosRG:'ertel:ativosRG' };
 
 let dbOffline = false;
 function showDbErrorBanner(msg){
@@ -286,7 +291,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[], ativos:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -306,6 +311,7 @@ async function bootstrap(){
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
+  DB.ativosRG = await loadAll(KEYS.ativosRG, []);
   if(!DB.usuarios.some(u=>u.master===true)){
     DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
@@ -384,7 +390,7 @@ function render(){
   const modulosDoUsuario = uAtualTop && uAtualTop.master ? ['mro','lub','ativos'] : ['mro','lub','ativos'].filter(m=>usuarioTemAcessoModulo(uAtualTop, m));
   const temMaisDeUmModulo = modulosDoUsuario.length > 1;
   const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : (moduloAtivo==='ativos' ? 'Cadastro de Ativos' : 'Estoque MRO');
-  const rotuloProdutos = moduloAtivo==='lub' ? 'Óleos' : 'Produtos';
+  const rotuloProdutos = moduloAtivo==='lub' ? 'Lubri' : 'Produtos';
   const navButtons = moduloAtivo==='ativos'
     ? `<button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
        <button data-v="produtos"><span>${ICONS.box}</span>Ativos</button>
@@ -464,7 +470,7 @@ function resetModuleUiState(){
   produtoSearch=''; editingProduto=null; showProdutoForm=false; pendingFotoDataUrl='';
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
-  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
+  ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
 }
 
 function attachModuloSelectorEvents(){
@@ -566,6 +572,8 @@ const TIPO_CAMPOS_ESPECIFICOS = {
 };
 const CRITICIDADES = [{v:'A',l:'A — Alta'},{v:'B',l:'B — Média'},{v:'C',l:'C — Baixa'}];
 const CAMPOS_COMPLETUDE_ATIVO = ['codigo','nome','tipo','fabricante','modelo','numeroSerie','placaIdentificacao','localizacao','criticidade','foto'];
+const SALA_MOTORES = '__SALA_MOTORES__';
+const TIPOS_RG = ['Motor','Motoredutor','Redutor','Bomba','Outros'];
 const QUICK_NA = ['Não se aplica','Sem informação'];
 const QUICK_PLACA = ['Sem placa de identificação','Placa ilegível'];
 
@@ -613,6 +621,7 @@ let ativoSearch = '';
 let editingAtivo = null;
 let showAtivoForm = false;
 let pendingFotoAtivoDataUrl = '';
+let pendingFoto2AtivoDataUrl = '';
 let mostrarInativosAtivos = false;
 let prefillAtivoPaiId = '';
 let ativoFormDraft = null;
@@ -623,7 +632,7 @@ function initAtivoFormDraft(base){
     ativoPaiId: base.ativoPaiId||prefillAtivoPaiId||'',
     fabricante: base.fabricante||'', modelo: base.modelo||'', numeroSerie: base.numeroSerie||'',
     placaIdentificacao: base.placaIdentificacao||'', localizacao: base.localizacao||'',
-    criticidade: base.criticidade||'', observacoes: base.observacoes||'', foto: base.foto||'',
+    criticidade: base.criticidade||'', observacoes: base.observacoes||'', foto: base.foto||'', foto2: base.foto2||'',
     campos: {...(base.campos||{})}
   };
 }
@@ -653,12 +662,47 @@ function getDescendentesIds(ativoId){
   return todos;
 }
 
+let ativosSubTab = 'cadastro';
+
 function ativosListView(){
   const isAdmin = isAdminLevel();
+  if(!isAdmin) ativosSubTab = 'pesquisa';
   const buscaAtiva = ativoSearch.trim()!=='';
-  const list = DB.ativos.filter(a=>(mostrarInativosAtivos || a.ativo!==false) && ((a.nome||'').toLowerCase().includes(ativoSearch.toLowerCase()) || (a.codigo||'').toLowerCase().includes(ativoSearch.toLowerCase())));
 
   let html = `<h2 class="section-title">Ativos</h2>`;
+  if(isAdmin){
+    html += `<div class="tabs-wrap">
+      <button class="btn ${ativosSubTab==='cadastro'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosCadastro">Cadastro</button>
+      <button class="btn ${ativosSubTab==='pesquisa'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosPesquisa">Pesquisa</button>
+    </div>`;
+  }
+
+  if(ativosSubTab==='pesquisa'){
+    const listaPesquisa = DB.ativos.filter(a=>a.ativo!==false && ((a.nome||'').toLowerCase().includes(ativoSearch.toLowerCase()) || (a.codigo||'').toLowerCase().includes(ativoSearch.toLowerCase())));
+    html += `<div class="search"><input id="ativoSearchInput" placeholder="Buscar por código ou nome" value="${ativoSearch}"></div>`;
+    if(listaPesquisa.length===0){ html += `<div class="empty"><div class="icon">🔎</div>Nenhum ativo encontrado.</div>`; }
+    listaPesquisa.forEach(a=>{
+      const pct = ativoCompletudePct(a);
+      const pai = a.ativoPaiId ? DB.ativos.find(x=>x.id===a.ativoPaiId) : null;
+      html += `<div class="tag-card"><div class="inner">
+        <div class="row1" style="align-items:center">
+          <div style="display:flex;align-items:center;gap:9px">
+            ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+            <span class="codigo">${a.codigo||'(sem código)'}</span>
+          </div>
+          ${a.criticidade?`<span class="pill ${a.criticidade}">${a.criticidade}</span>`:''}
+        </div>
+        <div class="desc">${a.nome||'(sem nome)'}</div>
+        <div class="meta"><span>${a.tipo||'—'}</span><span>${pct}% preenchido</span></div>
+        ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
+        ${pai?`<div class="note">Filho de: ${pai.codigo} — ${pai.nome}</div>`:''}
+      </div></div>`;
+    });
+    return html;
+  }
+
+  const list = DB.ativos.filter(a=>(mostrarInativosAtivos || a.ativo!==false) && ((a.nome||'').toLowerCase().includes(ativoSearch.toLowerCase()) || (a.codigo||'').toLowerCase().includes(ativoSearch.toLowerCase())));
+
   html += `<div class="search"><input id="ativoSearchInput" placeholder="Buscar por código ou nome" value="${ativoSearch}">
     ${isAdmin?`<button class="btn btn-primary" style="width:auto;padding:11px 16px;margin:0" id="newAtivoBtn">+ Novo</button>`:''}
   </div>`;
@@ -677,6 +721,7 @@ function ativosListView(){
           <div style="display:flex;align-items:center;gap:9px">
             ${nivel>0?'<span style="color:var(--muted)">↳</span>':''}
             ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+            ${a.foto2?`<img src="${a.foto2}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
             <span class="codigo">${a.codigo||'(sem código)'}</span>
           </div>
           ${a.criticidade?`<span class="pill ${a.criticidade}">${a.criticidade}</span>`:''}
@@ -714,6 +759,7 @@ function ativoFormSheet(){
   if(!ativoFormDraft) ativoFormDraft = initAtivoFormDraft(editingAtivo || {});
   const a = ativoFormDraft;
   const fotoAtual = pendingFotoAtivoDataUrl || a.foto || '';
+  const foto2Atual = pendingFoto2AtivoDataUrl || a.foto2 || '';
   const descendentesIds = editingAtivo ? getDescendentesIds(editingAtivo.id) : [];
   const opcoesPai = DB.ativos.filter(x=>x.ativo!==false && (!editingAtivo || (x.id!==editingAtivo.id && !descendentesIds.includes(x.id))));
   const especificos = (a.tipo && TIPO_CAMPOS_ESPECIFICOS[a.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[a.tipo] : [];
@@ -728,6 +774,12 @@ function ativoFormSheet(){
       <input type="file" accept="image/*" id="aFoto" style="flex:1">
     </div>
 
+    <label>Foto da placa de identificação (opcional)</label>
+    <div style="display:flex;align-items:center;gap:12px">
+      ${foto2Atual?`<img src="${foto2Atual}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+      <input type="file" accept="image/*" id="aFoto2" style="flex:1">
+    </div>
+
     <label>Código / TAG do ativo</label>
     <input id="aCodigo" value="${a.codigo}" placeholder="Ex: MTR-001">
     <label>Nome / Descrição</label>
@@ -738,7 +790,9 @@ function ativoFormSheet(){
     <div class="note">${a.tipo? 'Os campos técnicos abaixo foram ajustados para '+a.tipo+'.' : 'Escolha o tipo para ver os campos técnicos específicos dele.'}</div>
 
     <label>Ativo pai (opcional — deixe em branco se for um ativo raiz/independente)</label>
-    <select id="aAtivoPai"><option value="">Nenhum — ativo independente</option>${opcoesPai.map(p=>`<option value="${p.id}" ${a.ativoPaiId===p.id?'selected':''}>${p.codigo} — ${p.nome}</option>`).join('')}</select>
+    <select id="aAtivoPai"><option value="">Nenhum — ativo independente</option>${opcoesPai.map(p=>`<option value="${p.id}" ${a.ativoPaiId===p.id?'selected':''}>${p.codigo} — ${p.nome}</option>`).join('')}<option value="${SALA_MOTORES}" ${a.ativoPaiId===SALA_MOTORES?'selected':''}>🏠 Sala de Motores (equipamento reserva)</option></select>
+    <div class="note" id="salaMotoresNote" style="${a.ativoPaiId===SALA_MOTORES?'':'display:none'}color:var(--amber)">Ao salvar, isso vai virar um registro RG na Sala de Motores (equipamento reserva), não um ativo filho de verdade.</div>
+    <div class="note" id="rgVinculadoNote" style="display:none;color:#7FB4EE"></div>
     <div class="note">Use isso para ligar um motor, motobomba ou motoredutor a um equipamento maior (o "pai").</div>
 
     <label>Fabricante</label>
@@ -780,6 +834,11 @@ function ativoFormSheet(){
 }
 
 function attachAtivosEvents(){
+  const tCad = document.getElementById('tabAtivosCadastro');
+  if(tCad) tCad.onclick = ()=>{ ativosSubTab='cadastro'; renderView(); };
+  const tPes = document.getElementById('tabAtivosPesquisa');
+  if(tPes) tPes.onclick = ()=>{ ativosSubTab='pesquisa'; renderView(); };
+
   const s = document.getElementById('ativoSearchInput');
   if(s) s.oninput = ()=>{ ativoSearch = s.value; renderView(); const el=document.getElementById('ativoSearchInput'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
 
@@ -790,18 +849,18 @@ function attachAtivosEvents(){
   if(arvoreChk) arvoreChk.onchange = ()=>{ visualizacaoArvoreAtivos = arvoreChk.checked; renderView(); };
 
   const newBtn = document.getElementById('newAtivoBtn');
-  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+  if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
 
   document.querySelectorAll('.editAtivo').forEach(b=>{
-    b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+    b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
 
   document.querySelectorAll('.addFilhoAtivo').forEach(b=>{
-    b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; showAtivoForm=true; renderView(); };
+    b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
 
   const closeBtn = document.getElementById('closeAtivoForm');
-  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; renderView(); };
+  if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; renderView(); };
 
   const tipoSelect = document.getElementById('aTipo');
   if(tipoSelect) tipoSelect.onchange = ()=>{
@@ -814,28 +873,50 @@ function attachAtivosEvents(){
     b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
   });
 
-  const fotoInput = document.getElementById('aFoto');
-  if(fotoInput) fotoInput.onchange = (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev)=>{
-      const img = new Image();
-      img.onload = ()=>{
-        const maxSize = 360;
-        let w = img.width, h = img.height;
-        if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
-        else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        pendingFotoAtivoDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        captureAtivoFormValues();
-        renderView();
+  function wireFotoInput(inputId, onResult){
+    const el = document.getElementById(inputId);
+    if(!el) return;
+    el.onchange = (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const maxSize = 360;
+          let w = img.width, h = img.height;
+          if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
+          else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          onResult(canvas.toDataURL('image/jpeg', 0.7));
+          captureAtivoFormValues();
+          renderView();
+        };
+        img.src = ev.target.result;
       };
-      img.src = ev.target.result;
+      reader.readAsDataURL(file);
     };
-    reader.readAsDataURL(file);
+  }
+  wireFotoInput('aFoto', (url)=>{ pendingFotoAtivoDataUrl = url; });
+  wireFotoInput('aFoto2', (url)=>{ pendingFoto2AtivoDataUrl = url; });
+
+  const paiSelect = document.getElementById('aAtivoPai');
+  if(paiSelect) paiSelect.onchange = ()=>{
+    const note = document.getElementById('salaMotoresNote');
+    if(note) note.style.display = (paiSelect.value===SALA_MOTORES) ? '' : 'none';
+    const rgNote = document.getElementById('rgVinculadoNote');
+    if(rgNote){
+      if(paiSelect.value && paiSelect.value!==SALA_MOTORES){
+        const paiAtivo = DB.ativos.find(x=>x.id===paiSelect.value);
+        const rgs = paiAtivo ? DB.ativosRG.filter(rg=>rg.localizacao && rg.localizacao.toLowerCase().includes(paiAtivo.codigo.toLowerCase())) : [];
+        if(rgs.length>0){
+          rgNote.style.display = '';
+          rgNote.innerHTML = 'Este TAG tem RG reserva associado: ' + rgs.map(rg=>`<b>${rg.numeroRG}</b> (${rg.nome})`).join(', ');
+        } else { rgNote.style.display = 'none'; }
+      } else { rgNote.style.display = 'none'; }
+    }
   };
 
   const saveBtn = document.getElementById('saveAtivoBtn');
@@ -843,7 +924,25 @@ function attachAtivosEvents(){
     captureAtivoFormValues();
     const codigo = ativoFormDraft.codigo;
     const nome = ativoFormDraft.nome;
-    if(!codigo || !nome){ toast('Preencha ao menos código e nome'); return; }
+    if(!nome){ toast('Preencha ao menos o nome'); return; }
+
+    if(ativoFormDraft.ativoPaiId === SALA_MOTORES){
+      const numeroRG = prompt('Número do RG deste equipamento reserva:');
+      if(!numeroRG || !numeroRG.trim()){ toast('Cadastro cancelado — número de RG é obrigatório'); return; }
+      const tipoRG = TIPOS_RG.includes(ativoFormDraft.tipo) ? ativoFormDraft.tipo : 'Outros';
+      DB.ativosRG.push({
+        id:uid(), tipo:tipoRG, descricaoOutros: tipoRG==='Outros' ? (ativoFormDraft.tipo||nome) : '',
+        nome, numeroRG:numeroRG.trim(), localizacao: ativoFormDraft.localizacao || 'Sala de Motores',
+        fabricante: ativoFormDraft.fabricante, modelo: ativoFormDraft.modelo, numeroSerie: ativoFormDraft.numeroSerie,
+        dataCadastro:new Date().toISOString()
+      });
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl='';
+      toast('Cadastrado na Sala de Motores (RG) — consulte em Mais → Sala de Motores'); renderView();
+      return;
+    }
+
+    if(!codigo){ toast('Preencha o código'); return; }
     if(DB.ativos.some(a=>a.codigo.toLowerCase()===codigo.toLowerCase() && (!editingAtivo || a.id!==editingAtivo.id))){
       toast('Já existe um ativo cadastrado com esse código'); return;
     }
@@ -859,12 +958,13 @@ function attachAtivosEvents(){
       criticidade: ativoFormDraft.criticidade,
       observacoes: ativoFormDraft.observacoes,
       campos: {...ativoFormDraft.campos},
-      foto: pendingFotoAtivoDataUrl || (editingAtivo ? editingAtivo.foto : '') || ''
+      foto: pendingFotoAtivoDataUrl || (editingAtivo ? editingAtivo.foto : '') || '',
+      foto2: pendingFoto2AtivoDataUrl || (editingAtivo ? editingAtivo.foto2 : '') || ''
     };
     if(editingAtivo){ Object.assign(editingAtivo, dados); }
     else { DB.ativos.push({id:uid(), ...dados, ativo:true, dataCadastro:new Date().toISOString()}); }
     await saveAll(KEYS.ativos, DB.ativos);
-    showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; toast('Ativo salvo'); renderView();
+    showAtivoForm=false; editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; toast('Ativo salvo'); renderView();
   };
 
   const deactivateBtn = document.getElementById('deactivateAtivoBtn');
@@ -888,8 +988,20 @@ function attachAtivosEvents(){
 const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','Número de Série','Placa de Identificação','Localização','Criticidade (A/B/C)','Código do Ativo Pai (opcional)'];
 let exportAtivosBusy = false;
 
+let ativosMaisTab = 'importar';
+
 function ativosMaisView(){
-  let html = `<h2 class="section-title">Importar Planilha de Ativos</h2>
+  let html = `<div class="tabs-wrap">
+    <button class="btn ${ativosMaisTab==='importar'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosImportar">Importar/Exportar</button>
+    <button class="btn ${ativosMaisTab==='salamotores'?'btn-primary':'btn-ghost'} btn-sm" id="tabSalaMotores">Sala de Motores</button>
+  </div>`;
+
+  if(ativosMaisTab==='salamotores'){
+    html += salaMotoresSection();
+    return html;
+  }
+
+  html += `<h2 class="section-title">Importar Planilha de Ativos</h2>
   <div class="card">
     <div class="note">Importa uma lista de equipamentos em Excel (.xlsx) ou CSV para cadastrar ativos em massa. A coluna de ativo pai é opcional — deixe em branco se o ativo não tiver um "pai".</div>
     <button class="btn btn-primary btn-sm" id="importarAtivosBtn">Importar planilha</button>
@@ -907,7 +1019,76 @@ function ativosMaisView(){
   return html;
 }
 
+function salaMotoresSection(){
+  let html = `<div class="note" style="margin-bottom:10px">Equipamentos reserva (RG) — motores, motoredutores, redutores e bombas guardados como sobressalente, ainda não instalados em nenhum ativo.</div>`;
+  html += `<div class="card">
+    <label>Tipo de equipamento</label>
+    <select id="rgTipo">${TIPOS_RG.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+    <div id="rgOutrosWrap" class="hidden">
+      <label>Descrever o tipo</label>
+      <input id="rgOutrosDescricao" placeholder="Ex: Variador de frequência">
+    </div>
+    <label>Nome / Descrição</label>
+    <input id="rgNome" placeholder="Ex: Motor reserva 10 CV">
+    <label>Número de RG</label>
+    <input id="rgNumero" placeholder="Ex: RG-0032">
+    <label>Localização</label>
+    <input id="rgLocalizacao" placeholder="Ex: Sala de Motores - Prateleira 2" value="Sala de Motores">
+    <button class="btn btn-primary btn-sm" id="addRGBtn">Adicionar à Sala de Motores</button>
+  </div>`;
+
+  html += `<div class="row-2"><button class="btn btn-outline btn-sm" id="exportRGBtn">Exportar lista (Excel)</button></div>`;
+
+  if(DB.ativosRG.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum equipamento reserva cadastrado.</div>`; }
+  DB.ativosRG.slice().reverse().forEach(rg=>{
+    html += `<div class="tag-card"><div class="inner">
+      <div class="row1"><span class="codigo">${rg.numeroRG}</span><span class="qtd" style="font-size:12px">${rg.tipo==='Outros'?(rg.descricaoOutros||'Outros'):rg.tipo}</span></div>
+      <div class="desc">${rg.nome}</div>
+      <div class="meta"><span>📍 ${rg.localizacao}</span><span></span></div>
+      ${rg.fabricante||rg.modelo?`<div class="note">${rg.fabricante||''} ${rg.modelo?'· '+rg.modelo:''}</div>`:''}
+      <button class="btn btn-danger btn-sm deleteRGBtn" data-id="${rg.id}" style="margin-top:8px">Excluir</button>
+    </div></div>`;
+  });
+  return html;
+}
+
 function attachAtivosMaisEvents(){
+  const tImp = document.getElementById('tabAtivosImportar'); if(tImp) tImp.onclick = ()=>{ ativosMaisTab='importar'; renderView(); };
+  const tSala = document.getElementById('tabSalaMotores'); if(tSala) tSala.onclick = ()=>{ ativosMaisTab='salamotores'; renderView(); };
+
+  if(ativosMaisTab==='salamotores'){
+    const tipoSel = document.getElementById('rgTipo');
+    const outrosWrap = document.getElementById('rgOutrosWrap');
+    if(tipoSel) tipoSel.onchange = ()=>{ if(outrosWrap) outrosWrap.classList.toggle('hidden', tipoSel.value!=='Outros'); };
+
+    const addRGBtn = document.getElementById('addRGBtn');
+    if(addRGBtn) addRGBtn.onclick = async ()=>{
+      const tipo = document.getElementById('rgTipo').value;
+      const descricaoOutros = document.getElementById('rgOutrosDescricao') ? document.getElementById('rgOutrosDescricao').value.trim() : '';
+      const nome = document.getElementById('rgNome').value.trim();
+      const numeroRG = document.getElementById('rgNumero').value.trim();
+      const localizacao = document.getElementById('rgLocalizacao').value.trim();
+      if(!nome || !numeroRG){ toast('Preencha nome e número de RG'); return; }
+      if(DB.ativosRG.some(rg=>rg.numeroRG.toLowerCase()===numeroRG.toLowerCase())){ toast('Já existe um RG com esse número'); return; }
+      DB.ativosRG.push({id:uid(), tipo, descricaoOutros, nome, numeroRG, localizacao:localizacao||'Sala de Motores', fabricante:'', modelo:'', numeroSerie:'', dataCadastro:new Date().toISOString()});
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      toast('Adicionado à Sala de Motores'); renderView();
+    };
+
+    document.querySelectorAll('.deleteRGBtn').forEach(b=>{
+      b.onclick = async ()=>{
+        if(!confirm('Excluir este equipamento reserva definitivamente?')) return;
+        DB.ativosRG = DB.ativosRG.filter(rg=>rg.id!==b.dataset.id);
+        await saveAll(KEYS.ativosRG, DB.ativosRG);
+        toast('Excluído'); renderView();
+      };
+    });
+
+    const exportRGBtn = document.getElementById('exportRGBtn');
+    if(exportRGBtn) exportRGBtn.onclick = exportSalaMotoresXlsx;
+    return;
+  }
+
   const importarBtn = document.getElementById('importarAtivosBtn');
   if(importarBtn) importarBtn.onclick = showImportAtivosFormatModal;
 
@@ -919,6 +1100,20 @@ function attachAtivosMaisEvents(){
     const incluirHierarquia = document.getElementById('incluirHierarquiaExportChk').checked;
     exportAtivosXlsx(incluirHierarquia);
   };
+}
+
+function exportSalaMotoresXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  if(DB.ativosRG.length===0){ toast('Nenhum equipamento cadastrado na Sala de Motores'); return; }
+  const rows = DB.ativosRG.map(rg=>({
+    'Número RG': rg.numeroRG, 'Tipo': rg.tipo==='Outros'?(rg.descricaoOutros||'Outros'):rg.tipo,
+    'Nome': rg.nome, 'Localização': rg.localizacao, 'Fabricante': rg.fabricante||'', 'Modelo': rg.modelo||'',
+    'Número de Série': rg.numeroSerie||'', 'Data de Cadastro': new Date(rg.dataCadastro).toLocaleDateString('pt-BR')
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sala de Motores');
+  XLSX.writeFile(wb, `sala-de-motores-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function showImportAtivosFormatModal(){
@@ -1151,14 +1346,15 @@ async function startLoginScanner(){
     const video = document.getElementById('scanVideo');
     video.srcObject = scanStream;
     const canvas = document.getElementById('scanCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    avisarSeJsQRNaoCarregou('scanStatus');
     const tick = ()=>{
       if(!loginScanning || !scanStream) return;
       if(video.readyState === video.HAVE_ENOUGH_DATA){
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video,0,0,canvas.width,canvas.height);
         const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'}) : null;
         if(code && code.data){
           const parts = code.data.split(':');
           if(parts.length===2){
@@ -1318,12 +1514,13 @@ function produtosView(){
 }
 
 function produtoFormSheet(){
-  const p = editingProduto || {codigo:'',descricao:'',quantidade:0,valorUnitario:0,estoqueMinimo:0,endereco:'',foto:'',unidade:(moduloAtivo==='lub'?'litro':'peça')};
+  const p = editingProduto || {codigo:'',descricao:'',quantidade:0,valorUnitario:0,estoqueMinimo:0,endereco:'',foto:'',unidade:(moduloAtivo==='lub'?'litro':'peça'),tipoLubrificante:''};
   const fotoAtual = pendingFotoDataUrl || p.foto || '';
-  const unidades = ['peça','metro','litro','kg','caixa','par','rolo','conjunto'];
+  const unidades = moduloAtivo==='lub' ? ['kg','litro','ml'] : ['peça','metro','litro','kg','caixa','par','rolo','conjunto'];
+  const tiposLubrificante = ['Graxa','Graxa Spray','Óleo','Óleo Spray'];
   return `
   <div class="overlay" id="prodOverlay"><div class="sheet">
-    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingProduto?(moduloAtivo==='lub'?'Editar Óleo':'Editar Produto'):(moduloAtivo==='lub'?'Novo Óleo':'Novo Produto')}</h2><button class="close" id="closeProdForm">×</button></div>
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">${editingProduto?(moduloAtivo==='lub'?'Editar Lubrificante':'Editar Produto'):(moduloAtivo==='lub'?'Novo Lubrificante':'Novo Produto')}</h2><button class="close" id="closeProdForm">×</button></div>
 
     <label>Foto do produto</label>
     <div style="display:flex;align-items:center;gap:12px">
@@ -1335,11 +1532,13 @@ function produtoFormSheet(){
     <input id="fCodigo" value="${p.codigo}" placeholder="Ex: PF1234">
     <label>Descrição</label>
     <input id="fDescricao" value="${p.descricao}" placeholder="Ex: Parafuso M8 sextavado">
+    ${moduloAtivo==='lub'?`<label>Tipo de lubrificante</label>
+    <select id="fTipoLub"><option value="">Selecione...</option>${tiposLubrificante.map(t=>`<option value="${t}" ${p.tipoLubrificante===t?'selected':''}>${t}</option>`).join('')}</select>`:''}
     <label>Endereço (localização física)</label>
     <input id="fEndereco" value="${p.endereco||''}" placeholder="Ex: Corredor 3, Prateleira B2">
     <div class="row-2">
       <div><label>Quantidade</label><input id="fQuantidade" type="number" value="${p.quantidade}"></div>
-      <div><label>Unidade</label><select id="fUnidade">${unidades.map(u=>`<option value="${u}" ${(p.unidade||'peça')===u?'selected':''}>${u}</option>`).join('')}</select></div>
+      <div><label>Unidade</label><select id="fUnidade">${unidades.map(u=>`<option value="${u}" ${(p.unidade||unidades[0])===u?'selected':''}>${u}</option>`).join('')}</select></div>
     </div>
     <label>Valor unitário (R$)</label>
     <input id="fValor" type="number" step="0.01" value="${p.valorUnitario}">
@@ -1400,6 +1599,8 @@ function attachProdutosEvents(){
     const descricao = document.getElementById('fDescricao').value.trim();
     const endereco = document.getElementById('fEndereco').value.trim();
     const unidade = document.getElementById('fUnidade').value;
+    const tipoLubField = document.getElementById('fTipoLub');
+    const tipoLubrificante = tipoLubField ? tipoLubField.value : '';
     const quantidade = parseFloat(document.getElementById('fQuantidade').value)||0;
     const valorUnitario = parseFloat(document.getElementById('fValor').value)||0;
     const estoqueMinimo = parseFloat(document.getElementById('fMinimo').value)||0;
@@ -1408,9 +1609,9 @@ function attachProdutosEvents(){
     if(dup.existe){ toast(`Código já cadastrado em "${dup.modulo}" (${dup.produto.descricao}). Use outro código.`); return; }
     const foto = pendingFotoDataUrl || (editingProduto ? editingProduto.foto : '') || '';
     if(editingProduto){
-      Object.assign(editingProduto, {codigo,descricao,endereco,unidade,quantidade,valorUnitario,estoqueMinimo,foto});
+      Object.assign(editingProduto, {codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto});
     } else {
-      getProdutosArr().push({id:uid(),codigo,descricao,endereco,unidade,quantidade,valorUnitario,estoqueMinimo,foto,ativo:true,dataCadastro:new Date().toISOString()});
+      getProdutosArr().push({id:uid(),codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto,ativo:true,dataCadastro:new Date().toISOString()});
     }
     await saveAll(getProdutosKey(), getProdutosArr());
     showProdutoForm=false; editingProduto=null; pendingFotoDataUrl=''; toast('Produto salvo'); renderView();
@@ -1579,20 +1780,30 @@ function attachRetiradaEvents(){
   if(closeScan) closeScan.onclick = ()=>{ stopScanner(); showScanner=false; renderView(); };
 }
 
+function avisarSeJsQRNaoCarregou(statusElId){
+  setTimeout(()=>{
+    if(!window.jsQR){
+      const st = document.getElementById(statusElId);
+      if(st) st.textContent = 'A biblioteca de leitura de QR Code não carregou (falha de conexão). Atualize a página e tente de novo, ou digite o código manualmente.';
+    }
+  }, 3500);
+}
+
 async function startScanner(){
   try{
     scanStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
     const video = document.getElementById('scanVideo');
     video.srcObject = scanStream;
     const canvas = document.getElementById('scanCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    avisarSeJsQRNaoCarregou('scanStatus');
     const tick = ()=>{
       if(!showScanner || !scanStream) return;
       if(video.readyState === video.HAVE_ENOUGH_DATA){
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video,0,0,canvas.width,canvas.height);
         const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'}) : null;
         if(code && code.data){
           const produto = getProdutosArr().find(p=>p.codigo===code.data);
           if(produto){
@@ -1659,6 +1870,7 @@ function maisView(){
     <button class="btn ${maisTab==='alertas'?'btn-primary':'btn-ghost'} btn-sm" id="tabAlertas">Alertas de Recompra</button>
     <button class="btn ${maisTab==='indicadores'?'btn-primary':'btn-ghost'} btn-sm" id="tabIndicadores">Indicadores</button>
     <button class="btn ${maisTab==='importexport'?'btn-primary':'btn-ghost'} btn-sm" id="tabImportExport">Importar/Exportar</button>
+    ${moduloAtivo==='lub'?`<button class="btn ${maisTab==='grafico'?'btn-primary':'btn-ghost'} btn-sm" id="tabGrafico">Gráfico</button>`:''}
   </div>`;
   if(!master && maisTab==='usuarios') maisTab = 'centros';
 
@@ -1736,6 +1948,8 @@ function maisView(){
     html += indicadoresSection();
   } else if(maisTab==='importexport' ){
     html += importExportSection();
+  } else if(maisTab==='grafico' && moduloAtivo==='lub'){
+    html += graficoLubSection();
   }
   return html;
 }
@@ -1745,6 +1959,7 @@ function attachMaisEvents(){
   const talert = document.getElementById('tabAlertas'); if(talert) talert.onclick=()=>{maisTab='alertas'; renderView();};
   const tind = document.getElementById('tabIndicadores'); if(tind) tind.onclick=()=>{maisTab='indicadores'; renderView();};
   const tie = document.getElementById('tabImportExport'); if(tie) tie.onclick=()=>{maisTab='importexport'; renderView();};
+  const tgraf = document.getElementById('tabGrafico'); if(tgraf) tgraf.onclick=()=>{maisTab='grafico'; renderView();};
   const tinv = document.getElementById('tabInventario'); if(tinv) tinv.onclick=()=>{maisTab='inventario'; renderView();};
 
   const addCentro = document.getElementById('addCentroBtn');
@@ -1859,6 +2074,7 @@ function attachMaisEvents(){
   if(maisTab==='inventario') attachInventarioEvents();
   if(maisTab==='indicadores') attachIndicadoresEvents();
   if(maisTab==='importexport') attachImportExportEvents();
+  if(maisTab==='grafico') attachGraficoLubEvents();
 }
 
 /* ============ INVENTÁRIO ============ */
@@ -1942,6 +2158,65 @@ function attachIndicadoresEvents(){
 const FORMATO_COLUNAS_IMPORT = ['Código','Descrição','Endereço','Unidade','Quantidade','Valor Unitário','Estoque Mínimo'];
 let exportRetIni = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
 let exportRetFim = new Date().toISOString().slice(0,10);
+
+/* ============ GRÁFICO — CONSUMO DE LUBRIFICANTES ============ */
+let graficoTipoLub = 'Todos';
+
+function renderBarChart(itens){
+  if(itens.length===0) return `<div class="note">Sem retiradas para esse filtro.</div>`;
+  const max = Math.max(...itens.map(i=>i.valor)) || 1;
+  return itens.map(i=>`
+    <div class="barchart-row">
+      <div class="barchart-label" title="${i.nome}">${i.nome}</div>
+      <div class="barchart-track"><div class="barchart-fill" style="width:${Math.round((i.valor/max)*100)}%"></div></div>
+      <div class="barchart-value">${i.valor} ${i.unidade||''}</div>
+    </div>`).join('');
+}
+
+function graficoLubSection(){
+  const tipos = ['Todos','Graxa','Graxa Spray','Óleo','Óleo Spray'];
+  let html = `<div class="note" style="margin-bottom:10px">Consumo (quantidade retirada) de lubrificantes, filtrado por tipo.</div>`;
+  html += `<div class="tabs-wrap">${tipos.map(t=>`<button class="btn ${graficoTipoLub===t?'btn-primary':'btn-ghost'} btn-sm graficoTipoBtn" data-tipo="${t}">${t}</button>`).join('')}</div>`;
+
+  const produtos = DB.produtosLub;
+  const retiradas = DB.retiradasLub.filter(r=>{
+    if(graficoTipoLub==='Todos') return true;
+    const p = produtos.find(x=>x.id===r.produtoId);
+    return p && p.tipoLubrificante===graficoTipoLub;
+  });
+
+  const porProduto = {};
+  retiradas.forEach(r=>{
+    const p = produtos.find(x=>x.id===r.produtoId);
+    const nome = r.produtoDescricao || (p?p.descricao:'(produto removido)');
+    const unidade = r.produtoUnidade || (p?p.unidade:'');
+    if(!porProduto[nome]) porProduto[nome] = {valor:0, unidade};
+    porProduto[nome].valor += (r.quantidadeRetirada||0);
+  });
+  const itensProduto = Object.entries(porProduto).map(([nome,v])=>({nome, valor:Math.round(v.valor*100)/100, unidade:v.unidade})).sort((a,b)=>b.valor-a.valor).slice(0,15);
+
+  const porCentro = {};
+  retiradas.forEach(r=>{
+    const nome = r.localUsoDescricao || r.localUsoCodigo || '(centro removido)';
+    if(!porCentro[nome]) porCentro[nome] = 0;
+    porCentro[nome] += (r.quantidadeRetirada||0);
+  });
+  const itensCentro = Object.entries(porCentro).map(([nome,valor])=>({nome, valor:Math.round(valor*100)/100, unidade:''})).sort((a,b)=>b.valor-a.valor).slice(0,15);
+
+  html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Consumo por Produto Cadastrado${graficoTipoLub!=='Todos'?' — '+graficoTipoLub:''}</h2>`;
+  html += `<div class="card">${renderBarChart(itensProduto)}</div>`;
+
+  html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Consumo por Centro de Custo${graficoTipoLub!=='Todos'?' — '+graficoTipoLub:''}</h2>`;
+  html += `<div class="card">${renderBarChart(itensCentro)}</div>`;
+
+  return html;
+}
+
+function attachGraficoLubEvents(){
+  document.querySelectorAll('.graficoTipoBtn').forEach(b=>{
+    b.onclick = ()=>{ graficoTipoLub = b.dataset.tipo; renderView(); };
+  });
+}
 
 function importExportSection(){
   let html = `<h2 class="section-title" style="font-size:16px">Importar Planilha</h2>
@@ -2249,14 +2524,15 @@ async function startInvScanner(){
     const video = document.getElementById('scanVideo');
     video.srcObject = scanStream;
     const canvas = document.getElementById('scanCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    avisarSeJsQRNaoCarregou('scanStatus');
     const tick = ()=>{
       if(!invScanning || !scanStream) return;
       if(video.readyState === video.HAVE_ENOUGH_DATA){
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         ctx.drawImage(video,0,0,canvas.width,canvas.height);
         const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-        const code = window.jsQR ? jsQR(img.data, img.width, img.height) : null;
+        const code = window.jsQR ? jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'}) : null;
         if(code && code.data){
           const p = findProdutoByCodigo(code.data);
           invScanning=false; stopScanner(); renderInvScanner();
