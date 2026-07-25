@@ -107,6 +107,21 @@
   .search{display:flex;gap:8px;margin-bottom:12px;}
   .search input{flex:1;}
   .tabs-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+
+  /* Lista compacta de Ativos */
+  .ativo-row{display:flex;align-items:center;gap:9px;padding:10px 8px;border-bottom:1px solid var(--paper-2);cursor:pointer;border-left:3px solid transparent;}
+  .ativo-row:hover{background:var(--paper-2);}
+  .ativo-row.selecionado{background:rgba(232,163,61,.10);border-left:3px solid var(--amber);}
+  .ativo-expand-btn{width:22px;height:22px;flex-shrink:0;border-radius:6px;border:1px solid var(--line);background:var(--paper-2);
+    color:var(--muted);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .ativo-expand-btn:hover{color:var(--ink);border-color:var(--steel);}
+  .ativo-status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .ativo-row-info{display:flex;flex-direction:column;flex:1;min-width:0;}
+  .ativo-row-codigo{font-family:var(--font-mono);font-size:13px;color:var(--ink);}
+  .ativo-row-nome{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ativo-action-bar{position:sticky;top:0;z-index:5;background:var(--paper-2);border:1px solid var(--line);border-radius:10px;
+    padding:12px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.35);}
+  .ativo-action-bar-title{margin-bottom:10px;font-size:13.5px;color:var(--ink);display:flex;justify-content:space-between;align-items:center;}
   .tabs-wrap button{flex:0 0 auto;width:auto;margin-top:0;padding:8px 13px;}
   .barchart-row{display:flex;align-items:center;gap:8px;margin:7px 0;}
   .barchart-label{width:118px;font-size:11px;color:var(--muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -321,7 +336,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:''}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:''}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -337,7 +352,7 @@ async function bootstrap(){
   DB.retiradas = await loadAll(KEYS.retiradas, []);
   DB.centros = await loadAll(KEYS.centros, []);
   DB.usuarios = await loadAll(KEYS.usuarios, []);
-  DB.config = await loadAll(KEYS.config, {whatsappResumo:''});
+  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:''});
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
@@ -445,6 +460,28 @@ const LOGIN_DECOR = `<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/sv
     <path d="M-6 -5h12v10h-12z"/><path d="M-6 -1h12"/>
   </g>
 </svg>`;
+
+// Logo do login: usa a imagem personalizada (Configurações) se tiver sido enviada, senão a engrenagem padrão.
+function loginLogoMarkup(){
+  if(DB.config && DB.config.loginLogoImage){
+    return `<img src="${DB.config.loginLogoImage}" style="width:100%;height:100%;object-fit:contain;display:block">`;
+  }
+  return LOGO_MARK;
+}
+
+// Fundo do login: se houver imagem personalizada (Configurações), aplica ela por baixo dos
+// gradientes de escurecimento padrão (pra manter o texto legível); senão usa só os gradientes.
+function loginBackgroundStyleAttr(){
+  if(DB.config && DB.config.loginBackgroundImage){
+    return ` style="background:
+      radial-gradient(ellipse at 78% 12%, rgba(70,140,220,.30), transparent 55%),
+      radial-gradient(ellipse at 90% 75%, rgba(232,163,61,.12), transparent 55%),
+      linear-gradient(180deg,rgba(8,11,16,.88) 0%,rgba(12,18,28,.80) 55%,rgba(8,11,16,.92) 100%),
+      url('${DB.config.loginBackgroundImage}') center/cover no-repeat;"`;
+  }
+  return '';
+}
+
 /* ============ ICONS (inline svg, stroke=currentColor) ============ */
 const ICONS = {
   home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
@@ -532,9 +569,9 @@ function moduloSelectorScreen(){
   const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   return `
-  <div class="login-wrap"><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
+  <div class="login-wrap"${loginBackgroundStyleAttr()}><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
-      <div class="gear-badge">${LOGO_MARK}</div>
+      <div class="gear-badge">${loginLogoMarkup()}</div>
       <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">SELECIONE O ACESSO</div></div>
     </div>
     <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
@@ -567,6 +604,7 @@ function resetModuleUiState(){
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
+  ativoSelecionadoId=null; ativosExpandidos=new Set();
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
   showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
   showEquipForm=false; editingEquip=null; equipFormDraft=null;
@@ -938,6 +976,8 @@ function captureAtivoFormValues(){
   especificos.forEach(f=>{ const v = g('campo-'+f.id); if(v!==undefined) ativoFormDraft.campos[f.id] = v.trim(); });
 }
 let visualizacaoArvoreAtivos = true;
+let ativoSelecionadoId = null;
+let ativosExpandidos = new Set();
 
 function getDescendentesIds(ativoId){
   const filhosDiretos = DB.ativos.filter(a=>a.ativoPaiId===ativoId).map(a=>a.id);
@@ -1088,51 +1128,53 @@ function ativosListView(){
     ${isAdmin?`<label class="remember" style="color:var(--muted)"><input type="checkbox" id="mostrarInativosAtivosChk" ${mostrarInativosAtivos?'checked':''}> Mostrar desativados</label>`:''}
   </div>`;
 
-  function cardAtivo(a, nivel){
-    const pct = ativoCompletudePct(a);
+  function ativoListItem(a, nivel){
     const filhos = (visualizacaoArvoreAtivos && !buscaAtiva) ? DB.ativos.filter(x=>x.ativoPaiId===a.id && (mostrarInativosAtivos || x.ativo!==false)) : [];
-    const pai = a.ativoPaiId ? DB.ativos.find(x=>x.id===a.ativoPaiId) : null;
-    let h = `<div class="tag-card" data-aid="${a.id}" style="margin-left:${nivel*18}px">
-      <div class="inner">
-        <div class="row1" style="align-items:center">
-          <div style="display:flex;align-items:center;gap:9px">
-            ${nivel>0?'<span style="color:var(--muted)">↳</span>':''}
-            ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
-            ${a.foto2?`<img src="${a.foto2}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
-            <span class="codigo">${a.codigo||'(sem código)'}</span>
-          </div>
-          ${a.criticidade?`<span class="pill ${a.criticidade}">${a.criticidade}</span>`:''}
-        </div>
-        <div class="desc">${a.nome||'(sem nome)'}${a.ativo===false?' <span class="pill C">inativo</span>':''}</div>
-        <div class="meta"><span>${a.tipo||'—'}</span><span>${pct}% preenchido</span></div>
-        ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
-        ${pai && (buscaAtiva || !visualizacaoArvoreAtivos)?`<div class="note">Filho de: ${pai.codigo} — ${pai.nome}</div>`:''}
-        ${filhos.length>0?`<div class="note">${filhos.length} ativo${filhos.length>1?'s':''} filho${filhos.length>1?'s':''}</div>`:''}
-        ${a.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===a.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE">⚙️ ${m.tipo==='Motor'?'Motor':'Equipamento'} instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
-        ${isAdmin?`<div class="row-2" style="margin-top:10px">
-          <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
-          <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${a.id}">+ Adicionar filho</button>
-        </div>
-        <div class="row-2" style="margin-top:8px">
-          <button class="btn btn-outline btn-sm pecasAtivoBtn" data-id="${a.id}">Peças${(a.pecas&&a.pecas.length)?' ('+a.pecas.length+')':''}</button>
-          <button class="btn btn-outline btn-sm pdfAtivoBtn" data-id="${a.id}">PDF</button>
-        </div>`:''}
-      </div>
+    const temFilhos = filhos.length>0;
+    const expandido = ativosExpandidos.has(a.id);
+    const selecionado = ativoSelecionadoId===a.id;
+    const corStatus = a.ativo===false ? 'var(--muted)' : 'var(--moss)';
+
+    let h = `<div class="ativo-row ${selecionado?'selecionado':''}" data-aid="${a.id}" style="margin-left:${nivel*18}px">
+      <button class="ativo-expand-btn" data-id="${a.id}" style="${temFilhos?'':'visibility:hidden'}">${expandido?'−':'+'}</button>
+      <span class="ativo-status-dot" style="background:${corStatus}" title="${a.ativo===false?'Desativado':'Ativo'}"></span>
+      ${a.foto?`<img src="${a.foto}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0">`:''}
+      <span class="ativo-row-info">
+        <span class="ativo-row-codigo">${a.codigo||'(sem código)'}</span>
+        <span class="ativo-row-nome">${a.nome||'(sem nome)'}${temFilhos?' · '+filhos.length+' filho'+(filhos.length>1?'s':''):''}</span>
+      </span>
+      ${a.criticidade?`<span class="pill ${a.criticidade}">${a.criticidade}</span>`:''}
     </div>`;
-    filhos.forEach(f=>{ h += cardAtivo(f, nivel+1); });
+    if(temFilhos && expandido){ filhos.forEach(f=>{ h += ativoListItem(f, nivel+1); }); }
     return h;
   }
 
   if(list.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum ativo encontrado.</div>`; }
-  const raizes = (visualizacaoArvoreAtivos && !buscaAtiva) ? list.filter(a=>!a.ativoPaiId || !list.some(x=>x.id===a.ativoPaiId)) : list;
-  const modoArvore = visualizacaoArvoreAtivos && !buscaAtiva;
-  if(modoArvore){
-    raizes.forEach(a=>{ html += cardAtivo(a, 0); });
-  } else {
-    html += `<div class="card-grid">`;
-    raizes.forEach(a=>{ html += cardAtivo(a, 0); });
-    html += `</div>`;
+
+  if(isAdmin && ativoSelecionadoId){
+    const sel = DB.ativos.find(x=>x.id===ativoSelecionadoId);
+    if(sel){
+      const pai = sel.ativoPaiId ? DB.ativos.find(x=>x.id===sel.ativoPaiId) : null;
+      html += `<div class="ativo-action-bar">
+        <div class="ativo-action-bar-title"><span><b>${sel.codigo}</b> — ${sel.nome}${pai?` <span style="color:var(--muted)">(filho de ${pai.codigo})</span>`:''}</span>
+        <button class="btn btn-ghost btn-sm" id="fecharAcaoAtivoBtn" style="width:auto;margin:0;padding:4px 10px">×</button></div>
+        ${sel.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===sel.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE;margin-bottom:8px">⚙️ ${m.tipo==='Motor'?'Motor':'Equipamento'} instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
+        <div class="row-2">
+          <button class="btn btn-ghost btn-sm editAtivo" data-id="${sel.id}">Editar</button>
+          <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${sel.id}">+ Adicionar filho</button>
+        </div>
+        <div class="row-2" style="margin-top:8px">
+          <button class="btn btn-outline btn-sm pecasAtivoBtn" data-id="${sel.id}">Peças${(sel.pecas&&sel.pecas.length)?' ('+sel.pecas.length+')':''}</button>
+          <button class="btn btn-outline btn-sm pdfAtivoBtn" data-id="${sel.id}">PDF</button>
+        </div>
+      </div>`;
+    } else { ativoSelecionadoId = null; }
   }
+
+  const raizes = (visualizacaoArvoreAtivos && !buscaAtiva) ? list.filter(a=>!a.ativoPaiId || !list.some(x=>x.id===a.ativoPaiId)) : list;
+  html += `<div class="card">`;
+  raizes.forEach(a=>{ html += ativoListItem(a, 0); });
+  html += `</div>`;
 
   if(showAtivoForm && isAdmin) html += ativoFormSheet();
   if(pecasAtivoId && isAdmin) html += pecasSheet();
@@ -1427,6 +1469,26 @@ function attachAtivosEvents(){
 
   const newBtn = document.getElementById('newAtivoBtn');
   if(newBtn) newBtn.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
+
+  document.querySelectorAll('.ativo-expand-btn').forEach(b=>{
+    b.onclick = (e)=>{
+      e.stopPropagation();
+      if(ativosExpandidos.has(b.dataset.id)) ativosExpandidos.delete(b.dataset.id);
+      else ativosExpandidos.add(b.dataset.id);
+      renderView();
+    };
+  });
+
+  document.querySelectorAll('.ativo-row').forEach(row=>{
+    row.onclick = ()=>{
+      const id = row.dataset.aid;
+      ativoSelecionadoId = (ativoSelecionadoId===id) ? null : id;
+      renderView();
+    };
+  });
+
+  const fecharAcaoBtn = document.getElementById('fecharAcaoAtivoBtn');
+  if(fecharAcaoBtn) fecharAcaoBtn.onclick = (e)=>{ e.stopPropagation(); ativoSelecionadoId=null; renderView(); };
 
   document.querySelectorAll('.editAtivo').forEach(b=>{
     b.onclick = ()=>{ editingAtivo = DB.ativos.find(a=>a.id===b.dataset.id); ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
@@ -2563,9 +2625,9 @@ let loginScanning = false;
 
 function loginScreen(){
   return `
-  <div class="login-wrap"><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
+  <div class="login-wrap"${loginBackgroundStyleAttr()}><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
-      <div class="gear-badge">${LOGO_MARK}</div>
+      <div class="gear-badge">${loginLogoMarkup()}</div>
       <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">CONTROLE DE ESTOQUE</div></div>
     </div>
     <div class="login-tagline">Inteligência e precisão para o controle do seu estoque.</div>
@@ -3239,6 +3301,24 @@ function maisView(){
       <input id="whatsappResumo" placeholder="Ex: 5547999999999" value="${DB.config.whatsappResumo||''}">
       <button class="btn btn-primary btn-sm" id="saveWhatsappBtn">Salvar número</button>
     </div>`;
+    html += `<div class="card">
+      <div class="row1"><b>Personalização da tela de login</b></div>
+      <div class="note">Envie uma logo e/ou uma imagem de fundo próprias. Se não enviar nada, o sistema usa a engrenagem e o fundo padrão.</div>
+
+      <label style="margin-top:10px">Logo</label>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--line)">
+          ${DB.config.loginLogoImage?`<img src="${DB.config.loginLogoImage}" style="width:100%;height:100%;object-fit:contain">`:loginLogoMarkup()}
+        </div>
+        <input type="file" accept="image/*" id="loginLogoFile" style="flex:1">
+      </div>
+      ${DB.config.loginLogoImage?`<button class="btn btn-ghost btn-sm" id="removeLoginLogoBtn" style="margin-top:8px">Remover logo personalizada</button>`:''}
+
+      <label style="margin-top:14px">Imagem de fundo</label>
+      ${DB.config.loginBackgroundImage?`<img src="${DB.config.loginBackgroundImage}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--line);margin-bottom:8px">`:''}
+      <input type="file" accept="image/*" id="loginBackgroundFile">
+      ${DB.config.loginBackgroundImage?`<button class="btn btn-ghost btn-sm" id="removeLoginBackgroundBtn" style="margin-top:8px">Remover imagem de fundo</button>`:''}
+    </div>`;
     html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Usuários cadastrados</h2>`;
     DB.usuarios.forEach(u=>{
       html += `<div class="card">
@@ -3347,6 +3427,58 @@ function attachMaisEvents(){
     DB.config.whatsappResumo = numero;
     await saveAll(KEYS.config, DB.config);
     toast('Número salvo'); renderView();
+  };
+
+  function lerEcomprimirImagem(file, maxSize, qualidade, callback){
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
+        else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', qualidade));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const loginLogoFile = document.getElementById('loginLogoFile');
+  if(loginLogoFile) loginLogoFile.onchange = (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    lerEcomprimirImagem(file, 300, 0.85, async (dataUrl)=>{
+      DB.config.loginLogoImage = dataUrl;
+      await saveAll(KEYS.config, DB.config);
+      toast('Logo atualizada'); renderView();
+    });
+  };
+  const removeLoginLogoBtn = document.getElementById('removeLoginLogoBtn');
+  if(removeLoginLogoBtn) removeLoginLogoBtn.onclick = async ()=>{
+    DB.config.loginLogoImage = '';
+    await saveAll(KEYS.config, DB.config);
+    toast('Logo personalizada removida — voltou ao padrão'); renderView();
+  };
+
+  const loginBackgroundFile = document.getElementById('loginBackgroundFile');
+  if(loginBackgroundFile) loginBackgroundFile.onchange = (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    lerEcomprimirImagem(file, 1600, 0.75, async (dataUrl)=>{
+      DB.config.loginBackgroundImage = dataUrl;
+      await saveAll(KEYS.config, DB.config);
+      toast('Imagem de fundo atualizada'); renderView();
+    });
+  };
+  const removeLoginBackgroundBtn = document.getElementById('removeLoginBackgroundBtn');
+  if(removeLoginBackgroundBtn) removeLoginBackgroundBtn.onclick = async ()=>{
+    DB.config.loginBackgroundImage = '';
+    await saveAll(KEYS.config, DB.config);
+    toast('Imagem de fundo removida — voltou ao padrão'); renderView();
   };
 
   document.querySelectorAll('.saveCred').forEach(b=>{
