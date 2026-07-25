@@ -569,7 +569,7 @@ function resetModuleUiState(){
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
   showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
-  motorConsertoEnvioId=null; motorConsertoRetornoId=null;
+  motorConsertoEnvioId=null; motorConsertoRetornoId=null; motorHistoricoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
 }
 
@@ -831,6 +831,7 @@ let ativosSubTab = 'cadastro';
 let showMotorForm = false, editingMotor = null, motorFormDraft = null, pendingFotoMotorDataUrl = '';
 let motorMoveId = null, motorMoveDestino = '';
 let motorConsertoEnvioId = null, motorConsertoRetornoId = null;
+let motorHistoricoId = null;
 const STATUS_MOTOR = { reserva:'Em reserva', instalado:'Instalado', atencao:'Aguardando decisão', conserto:'Em conserto', descarte:'Descartado' };
 
 function proximoNumeroRGMotor(){
@@ -1448,6 +1449,7 @@ function salaMotoresSection(){
     html += `</div>`;
     if(motorMoveId) html += motorMoveSheet();
     if(motorConsertoEnvioId) html += consertoEnvioSheet();
+    if(motorHistoricoId) html += historicoSheet();
     return html;
   }
 
@@ -1458,6 +1460,7 @@ function salaMotoresSection(){
     lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
     html += `</div>`;
     if(motorMoveId) html += motorMoveSheet();
+    if(motorHistoricoId) html += historicoSheet();
     return html;
   }
 
@@ -1469,6 +1472,7 @@ function salaMotoresSection(){
     lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
     html += `</div>`;
     if(motorConsertoRetornoId) html += consertoRetornoSheet();
+    if(motorHistoricoId) html += historicoSheet();
     return html;
   }
 
@@ -1533,7 +1537,7 @@ function motorCard(m){
       </div>
       <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
 
-      ${m.status==='conserto'?`<div class="note" style="color:var(--amber)">Aguardando retorno${consertoAberto&&consertoAberto.fornecedor?' — Fornecedor: '+consertoAberto.fornecedor:''}${consertoAberto&&consertoAberto.dataEnvio?' (enviado em '+new Date(consertoAberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR')+')':''}</div>
+      ${m.status==='conserto'?`<div class="note" style="color:var(--amber)">Aguardando retorno${consertoAberto&&consertoAberto.fornecedor?' — Fornecedor: '+consertoAberto.fornecedor:''}${consertoAberto&&consertoAberto.nf?' — NF: '+consertoAberto.nf:''}${consertoAberto&&consertoAberto.dataEnvio?' (enviado em '+new Date(consertoAberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR')+')':''}</div>
       <button class="btn btn-primary btn-sm motorRegistrarRetornoBtn" data-id="${m.id}" style="margin-top:8px">Registrar retorno</button>`:''}
 
       ${m.status==='descarte'?`<div class="note" style="color:var(--brick)">Motor descartado.</div>
@@ -1541,9 +1545,12 @@ function motorCard(m){
 
       <div class="row-2" style="margin-top:8px">
         ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
-        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
+        <button class="btn btn-outline btn-sm motorHistoricoBtn" data-id="${m.id}">📋 Histórico</button>
       </div>
-      <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}" style="margin-top:8px">Excluir</button>
+      <div class="row-2" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
+        <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}">Excluir</button>
+      </div>
     </div></div>`;
 }
 
@@ -1557,6 +1564,8 @@ function consertoEnvioSheet(){
     <div class="sheet-head"><h2 class="section-title" style="margin:0">Enviar ${m.numeroRG} para conserto</h2><button class="close" id="closeConsertoEnvio">×</button></div>
     <label>Fornecedor / Oficina</label>
     <input id="consertoFornecedor" placeholder="Ex: Rebobinagem WEG - Oficina Central">
+    <label>N° da NF de remessa</label>
+    <input id="consertoNF" placeholder="Ex: 12345">
     <label>Data de envio</label>
     <input id="consertoDataEnvio" type="date" value="${hoje}">
     <div class="note">O motor fica em "Aguardando retorno" na aba Conserto / Descarte até você registrar o retorno com o valor gasto.</div>
@@ -1575,10 +1584,53 @@ function consertoRetornoSheet(){
     ${aberto?`<div class="note">Enviado para conserto em ${aberto.dataEnvio?new Date(aberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR'):'—'}${aberto.fornecedor?' — '+aberto.fornecedor:''}.</div>`:''}
     <label>Valor gasto no conserto (R$)</label>
     <input id="consertoValorRetorno" type="number" step="0.01" min="0" placeholder="Ex: 350.00">
+    <label>N° do orçamento</label>
+    <input id="consertoOrcamentoRetorno" placeholder="Ex: ORC-2026-0143">
     <div class="row-2" style="margin-top:14px">
       <button class="btn btn-primary" id="confirmRetornoReservaBtn">Retornar para Sala de Motores</button>
       <button class="btn btn-danger" id="confirmRetornoDescarteBtn">Tornar inativo (descarte)</button>
     </div>
+  </div></div>`;
+}
+
+/* ---- Histórico completo do RG: movimentações de TAG + consertos, com totais ---- */
+function historicoSheet(){
+  const m = DB.ativosRG.find(r=>r.id===motorHistoricoId);
+  if(!m) return '';
+  const movimentacoes = (m.historico||[]).slice().reverse();
+  const consertos = (m.consertos||[]).slice().reverse();
+  const custoTotal = motorCustoTotalConserto(m);
+  const mtbf = motorMTBFDias(m);
+  const fmtData = d => d ? new Date(d+ (d.length<=10?'T00:00:00':'')).toLocaleDateString('pt-BR') : '—';
+
+  return `
+  <div class="overlay" id="historicoOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Histórico — ${m.numeroRG}</h2><button class="close" id="closeHistorico">×</button></div>
+
+    <div class="metrics">
+      <div class="metric"><div class="val">${movimentacoes.length}</div><div class="lbl">Movimentações</div></div>
+      <div class="metric amber"><div class="val">${consertos.length}</div><div class="lbl">Consertos</div></div>
+    </div>
+    <div class="metrics">
+      <div class="metric amber"><div class="val" style="font-size:20px">${formataMoeda(custoTotal)}</div><div class="lbl">Custo total em manutenção</div></div>
+      ${mtbf!==null?`<div class="metric"><div class="val">${mtbf}</div><div class="lbl">MTBF (dias)</div></div>`:''}
+    </div>
+
+    <h2 class="section-title" style="font-size:14px;margin-top:16px">Movimentações entre TAGs</h2>
+    ${movimentacoes.length===0?`<div class="note">Nenhuma movimentação registrada.</div>`:movimentacoes.map(h=>`
+      <div class="tag-card"><div class="inner">
+        <div class="row1"><span class="codigo">${h.ativoCodigo||'—'}</span><span></span></div>
+        <div class="meta"><span>Entrada: ${fmtData(h.dataEntrada)}</span><span>Saída: ${h.dataSaida?fmtData(h.dataSaida):'em andamento'}</span></div>
+      </div></div>`).join('')}
+
+    <h2 class="section-title" style="font-size:14px;margin-top:16px">Consertos <span style="color:var(--amber)">— total ${formataMoeda(custoTotal)}</span></h2>
+    ${consertos.length===0?`<div class="note">Nenhum conserto registrado.</div>`:consertos.map(c=>`
+      <div class="tag-card"><div class="inner">
+        <div class="row1"><span class="codigo">${c.fornecedor||'—'}</span><span class="qtd">${c.valor!=null?formataMoeda(c.valor):'em aberto'}</span></div>
+        ${c.nf?`<div class="note">NF de remessa: ${c.nf}</div>`:''}
+        ${c.orcamento?`<div class="note">Orçamento: ${c.orcamento}</div>`:''}
+        <div class="meta"><span>Envio: ${fmtData(c.dataEnvio)}</span><span>Retorno: ${c.dataRetorno?fmtData(c.dataRetorno):'aguardando'}</span></div>
+      </div></div>`).join('')}
   </div></div>`;
 }
 
@@ -1644,6 +1696,12 @@ function attachAtivosMaisEvents(){
       };
     });
 
+    document.querySelectorAll('.motorHistoricoBtn').forEach(b=>{
+      b.onclick = ()=>{ motorHistoricoId=b.dataset.id; renderView(); };
+    });
+    const closeHistoricoBtn = document.getElementById('closeHistorico');
+    if(closeHistoricoBtn) closeHistoricoBtn.onclick = ()=>{ motorHistoricoId=null; renderView(); };
+
     document.querySelectorAll('.motorEnviarConsertoBtn').forEach(b=>{
       b.onclick = ()=>{ motorConsertoEnvioId=b.dataset.id; renderView(); };
     });
@@ -1654,10 +1712,11 @@ function attachAtivosMaisEvents(){
       const motor = DB.ativosRG.find(r=>r.id===motorConsertoEnvioId);
       if(!motor) return;
       const fornecedor = (document.getElementById('consertoFornecedor')||{}).value?.trim() || '';
+      const nf = (document.getElementById('consertoNF')||{}).value?.trim() || '';
       const dataEnvio = (document.getElementById('consertoDataEnvio')||{}).value || new Date().toISOString().slice(0,10);
       if(!fornecedor){ toast('Preencha o fornecedor/oficina'); return; }
       if(!motor.consertos) motor.consertos = [];
-      motor.consertos.push({id:uid(), fornecedor, dataEnvio, dataRetorno:null, valor:null});
+      motor.consertos.push({id:uid(), fornecedor, nf, dataEnvio, dataRetorno:null, valor:null});
       motor.status = 'conserto';
       await saveAll(KEYS.ativosRG, DB.ativosRG);
       motorConsertoEnvioId=null;
@@ -1675,8 +1734,10 @@ function attachAtivosMaisEvents(){
       if(!motor) return;
       const valorInput = document.getElementById('consertoValorRetorno');
       const valor = valorInput && valorInput.value!=='' ? parseFloat(valorInput.value) : null;
+      const orcamentoInput = document.getElementById('consertoOrcamentoRetorno');
+      const orcamento = orcamentoInput ? orcamentoInput.value.trim() : '';
       const aberto = motorConsertoAberto(motor);
-      if(aberto){ aberto.dataRetorno = new Date().toISOString().slice(0,10); aberto.valor = valor; }
+      if(aberto){ aberto.dataRetorno = new Date().toISOString().slice(0,10); aberto.valor = valor; aberto.orcamento = orcamento; }
       motor.status = novoStatus;
       await saveAll(KEYS.ativosRG, DB.ativosRG);
       motorConsertoRetornoId=null;
