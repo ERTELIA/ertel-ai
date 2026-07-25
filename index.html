@@ -506,7 +506,7 @@ function resetModuleUiState(){
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
-  showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorLinkAtivoId=null; motorLinkNovoTag=''; motorLinkSelecionadoId='';
+  showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
 }
 
 function attachModuloSelectorEvents(){
@@ -765,8 +765,8 @@ function getDescendentesIds(ativoId){
 
 let ativosSubTab = 'cadastro';
 let showMotorForm = false, editingMotor = null, motorFormDraft = null, pendingFotoMotorDataUrl = '';
-let motorLinkAtivoId = null, motorLinkNovoTag = '', motorLinkSelecionadoId = '';
-const STATUS_MOTOR = { reserva:'Em reserva', instalado:'Instalado', atencao:'Aguardando decisão', conserto:'Em conserto', inativo:'Inativo' };
+let motorMoveId = null, motorMoveDestino = '';
+const STATUS_MOTOR = { reserva:'Em reserva', instalado:'Instalado', atencao:'Aguardando decisão', conserto:'Em conserto', descarte:'Descartado' };
 
 function proximoNumeroRGMotor(){
   let max = 0;
@@ -779,9 +779,6 @@ function proximoNumeroRGMotor(){
   return 'M' + String(max+1).padStart(4,'0');
 }
 
-function motoresDisponiveis(){
-  return DB.ativosRG.filter(rg=>rg.tipo==='Motor' && rg.status==='reserva');
-}
 
 function ativosListView(){
   const isAdmin = isAdminLevel();
@@ -792,14 +789,8 @@ function ativosListView(){
   if(isAdmin){
     html += `<div class="tabs-wrap">
       <button class="btn ${ativosSubTab==='cadastro'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosCadastro">Equipamento</button>
-      <button class="btn ${ativosSubTab==='motor'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosMotor">Motor</button>
       <button class="btn ${ativosSubTab==='pesquisa'?'btn-primary':'btn-ghost'} btn-sm" id="tabAtivosPesquisa">Pesquisa</button>
     </div>`;
-  }
-
-  if(ativosSubTab==='motor' && isAdmin){
-    html += motorCadastroView();
-    return html;
   }
 
   if(ativosSubTab==='pesquisa'){
@@ -858,7 +849,7 @@ function ativosListView(){
         ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
         ${pai && (buscaAtiva || !visualizacaoArvoreAtivos)?`<div class="note">Filho de: ${pai.codigo} — ${pai.nome}</div>`:''}
         ${filhos.length>0?`<div class="note">${filhos.length} ativo${filhos.length>1?'s':''} filho${filhos.length>1?'s':''}</div>`:''}
-        ${a.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===a.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE">⚙️ Motor instalado: <b>${m.numeroRG}</b> (${m.nome})</div>`:''; })():''}
+        ${a.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===a.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE">⚙️ Motor instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
         ${isAdmin?`<div class="row-2" style="margin-top:10px">
           <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
           <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${a.id}">+ Adicionar filho</button>
@@ -866,9 +857,6 @@ function ativosListView(){
         <div class="row-2" style="margin-top:8px">
           <button class="btn btn-outline btn-sm pecasAtivoBtn" data-id="${a.id}">Peças${(a.pecas&&a.pecas.length)?' ('+a.pecas.length+')':''}</button>
           <button class="btn btn-outline btn-sm pdfAtivoBtn" data-id="${a.id}">PDF</button>
-        </div>
-        <div class="row-2" style="margin-top:8px">
-          <button class="btn btn-amber btn-sm motorFilhoBtn" data-id="${a.id}" style="margin-top:0">${a.motorInstaladoId?'🔁 Trocar motor (RG)':'⚙️ Motor filho (RG)'}</button>
         </div>`:''}
       </div>
     </div>`;
@@ -882,56 +870,16 @@ function ativosListView(){
 
   if(showAtivoForm && isAdmin) html += ativoFormSheet();
   if(pecasAtivoId && isAdmin) html += pecasSheet();
-  if(motorLinkAtivoId && isAdmin) html += motorLinkSheet();
   return html;
 }
 
-/* ---- Vínculo de Motor (RG) a um TAG filho ---- */
-function motorLinkSheet(){
-  const pai = DB.ativos.find(a=>a.id===motorLinkAtivoId);
-  if(!pai) return '';
-  const filhosMotor = DB.ativos.filter(a=>a.ativoPaiId===pai.id && a.motorInstaladoId);
-  const disponiveis = motoresDisponiveis();
-  return `
-  <div class="overlay" id="motorLinkOverlay"><div class="sheet">
-    <div class="sheet-head"><h2 class="section-title" style="margin:0">Motor filho — ${pai.codigo}</h2><button class="close" id="closeMotorLink">×</button></div>
-
-    ${filhosMotor.length>0?`<h2 class="section-title" style="font-size:14px">TAGs de motor já existentes neste equipamento</h2>
-      ${filhosMotor.map(f=>{
-        const m = DB.ativosRG.find(r=>r.id===f.motorInstaladoId);
-        return `<div class="tag-card"><div class="inner">
-          <div class="row1"><span class="codigo">${f.codigo}</span>${m?`<span class="pill A">${m.numeroRG}</span>`:''}</div>
-          <div class="desc">${f.nome}</div>
-          ${m?`<div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>`:''}
-          <label style="margin-top:10px">Trocar por outro RG em reserva</label>
-          <select class="motorTrocaSelect" data-tag="${f.id}">
-            <option value="">Selecione o novo RG...</option>
-            ${disponiveis.map(d=>`<option value="${d.id}">${d.numeroRG} — ${d.nome}</option>`).join('')}
-          </select>
-          <button class="btn btn-primary btn-sm motorTrocaBtn" data-tag="${f.id}">Confirmar troca</button>
-          <div class="note">O RG antigo volta para a Sala de Motores com status "Aguardando decisão".</div>
-        </div></div>`;
-      }).join('')}`:''}
-
-    <h2 class="section-title" style="font-size:14px;margin-top:16px">Adicionar novo TAG de motor filho</h2>
-    ${disponiveis.length===0?`<div class="note" style="color:var(--brick)">Não há motores em reserva. Cadastre um na aba Motor primeiro.</div>`:`
-    <label>TAG do motor filho</label>
-    <input id="motorLinkNovoTag" value="${motorLinkNovoTag}" placeholder="Ex: ${pai.codigo}-MTR">
-    <label>Motor (RG) em reserva</label>
-    <select id="motorLinkSelecionado">
-      <option value="">Selecione...</option>
-      ${disponiveis.map(d=>`<option value="${d.id}" ${motorLinkSelecionadoId===d.id?'selected':''}>${d.numeroRG} — ${d.nome}</option>`).join('')}
-    </select>
-    <button class="btn btn-primary" id="criarMotorFilhoBtn">Vincular e criar TAG filho</button>`}
-  </div></div>`;
-}
-
-function instalarMotorNoTag(motorId, childAtivo){
+/* ---- Movimentação de RG de motor entre Sala de Motores e um TAG existente ---- */
+function movimentarRGParaAtivo(motorId, destinoAtivo){
   const novo = DB.ativosRG.find(r=>r.id===motorId);
-  if(!novo) return;
-  const antigoId = childAtivo.motorInstaladoId;
-  if(antigoId){
-    const antigo = DB.ativosRG.find(r=>r.id===antigoId);
+  if(!novo || !destinoAtivo) return;
+  const antigoMotorId = destinoAtivo.motorInstaladoId;
+  if(antigoMotorId){
+    const antigo = DB.ativosRG.find(r=>r.id===antigoMotorId);
     if(antigo){
       antigo.status = 'atencao';
       antigo.ativoId = null;
@@ -942,62 +890,16 @@ function instalarMotorNoTag(motorId, childAtivo){
     }
   }
   novo.status = 'instalado';
-  novo.ativoId = childAtivo.id;
+  novo.ativoId = destinoAtivo.id;
   if(!novo.historico) novo.historico = [];
-  novo.historico.push({ativoId:childAtivo.id, ativoCodigo:childAtivo.codigo, dataEntrada:new Date().toISOString(), dataSaida:null});
-  childAtivo.motorInstaladoId = novo.id;
-  childAtivo.fabricante = novo.fabricante||'';
-  childAtivo.modelo = novo.modelo||'';
-  childAtivo.numeroSerie = novo.numeroSerie||'';
-  childAtivo.placaIdentificacao = novo.placaIdentificacao||'';
-  childAtivo.campos = {...(novo.campos||{})};
-}
-
-function attachMotorLinkEvents(){
-  const closeBtn = document.getElementById('closeMotorLink');
-  if(closeBtn) closeBtn.onclick = ()=>{ motorLinkAtivoId=null; motorLinkNovoTag=''; motorLinkSelecionadoId=''; renderView(); };
-
-  document.querySelectorAll('.motorTrocaBtn').forEach(b=>{
-    b.onclick = async ()=>{
-      const sel = document.querySelector(`.motorTrocaSelect[data-tag="${b.dataset.tag}"]`);
-      if(!sel || !sel.value){ toast('Selecione o novo RG'); return; }
-      const childAtivo = DB.ativos.find(a=>a.id===b.dataset.tag);
-      if(!childAtivo) return;
-      instalarMotorNoTag(sel.value, childAtivo);
-      await saveAll(KEYS.ativos, DB.ativos);
-      await saveAll(KEYS.ativosRG, DB.ativosRG);
-      toast('Motor trocado. O RG antigo está em "Aguardando decisão" na Sala de Motores.');
-      renderView();
-    };
-  });
-
-  const tagInput = document.getElementById('motorLinkNovoTag');
-  if(tagInput) tagInput.oninput = ()=>{ motorLinkNovoTag = tagInput.value; };
-  const selInput = document.getElementById('motorLinkSelecionado');
-  if(selInput) selInput.onchange = ()=>{ motorLinkSelecionadoId = selInput.value; };
-
-  const criarBtn = document.getElementById('criarMotorFilhoBtn');
-  if(criarBtn) criarBtn.onclick = async ()=>{
-    const pai = DB.ativos.find(a=>a.id===motorLinkAtivoId);
-    const tag = (document.getElementById('motorLinkNovoTag')||{}).value?.trim();
-    const motorId = (document.getElementById('motorLinkSelecionado')||{}).value;
-    if(!tag){ toast('Preencha o TAG do motor filho'); return; }
-    if(!motorId){ toast('Selecione um motor (RG)'); return; }
-    if(DB.ativos.some(a=>a.codigo.toLowerCase()===tag.toLowerCase())){ toast('Já existe um ativo cadastrado com esse TAG'); return; }
-    const motor = DB.ativosRG.find(r=>r.id===motorId);
-    const novoAtivo = {
-      id:uid(), codigo:tag, nome: motor?motor.nome:'Motor', tipo:'Motor', ativoPaiId: pai.id,
-      fabricante:'', modelo:'', numeroSerie:'', placaIdentificacao:'', localizacao: pai.localizacao||'',
-      criticidade:'', observacoes:'', campos:{}, foto:'', foto2:'', ativo:true, motorInstaladoId:null,
-      dataCadastro:new Date().toISOString()
-    };
-    instalarMotorNoTag(motorId, novoAtivo);
-    DB.ativos.push(novoAtivo);
-    await saveAll(KEYS.ativos, DB.ativos);
-    await saveAll(KEYS.ativosRG, DB.ativosRG);
-    motorLinkAtivoId=null; motorLinkNovoTag=''; motorLinkSelecionadoId='';
-    toast('TAG de motor filho criado e RG vinculado'); renderView();
-  };
+  novo.historico.push({ativoId:destinoAtivo.id, ativoCodigo:destinoAtivo.codigo, dataEntrada:new Date().toISOString(), dataSaida:null});
+  destinoAtivo.motorInstaladoId = novo.id;
+  destinoAtivo.tipo = 'Motor';
+  destinoAtivo.fabricante = novo.fabricante||'';
+  destinoAtivo.modelo = novo.modelo||'';
+  destinoAtivo.numeroSerie = novo.numeroSerie||'';
+  destinoAtivo.placaIdentificacao = novo.placaIdentificacao||'';
+  destinoAtivo.campos = {...(novo.campos||{})};
 }
 
 function quickFillButtons(fieldId, opcoes){
@@ -1112,40 +1014,6 @@ function captureMotorFormValues(){
   MOTOR_FIELDS.forEach(f=>{ const v = g('mcampo-'+f.id); if(v!==undefined) motorFormDraft.campos[f.id] = v.trim(); });
 }
 
-function motorCadastroView(){
-  const motores = DB.ativosRG.filter(rg=>rg.tipo==='Motor');
-  let html = `<div class="note" style="margin-bottom:10px">Cadastro de unidades de motor. Cada motor recebe um RG sequencial automático (M0001, M0002...). O RG pode ser instalado em um TAG de equipamento e trocado de posição quando o motor for substituído.</div>`;
-  html += `<button class="btn btn-primary" id="newMotorBtn">+ Novo motor</button>`;
-
-  if(motores.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum motor cadastrado ainda.</div>`; }
-  motores.slice().reverse().forEach(m=>{
-    const statusLabel = STATUS_MOTOR[m.status] || m.status;
-    const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
-    const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
-    html += `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
-      <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
-      <div class="desc">${m.nome}</div>
-      ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
-      ${instaladoEm?`<div class="meta"><span>📍 Instalado em: ${instaladoEm.codigo} — ${instaladoEm.nome}</span><span></span></div>`:`<div class="meta"><span>📍 ${m.localizacao||'Sala de Motores'}</span><span></span></div>`}
-      <div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>
-      ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão: voltar para reserva, ir para conserto ou ficar inativo.</div>
-      <div class="row-2" style="margin-top:8px">
-        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva">Reserva</button>
-        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="conserto">Conserto</button>
-      </div>
-      <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="inativo" style="margin-top:8px;border-color:var(--brick);color:var(--brick)">Marcar inativo</button>`:''}
-      ${(m.status==='conserto'||m.status==='inativo')?`<button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Voltar para reserva</button>`:''}
-      <div class="row-2" style="margin-top:8px">
-        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
-        <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}">Excluir</button>
-      </div>
-    </div></div>`;
-  });
-
-  if(showMotorForm) html += motorFormSheet();
-  return html;
-}
-
 function motorFormSheet(){
   if(!motorFormDraft) motorFormDraft = initMotorFormDraft(editingMotor || {});
   const m = motorFormDraft;
@@ -1194,107 +1062,11 @@ function motorFormSheet(){
   </div></div>`;
 }
 
-function attachMotorCadastroEvents(){
-  const newBtn = document.getElementById('newMotorBtn');
-  if(newBtn) newBtn.onclick = ()=>{ editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
-
-  document.querySelectorAll('.editMotorBtn').forEach(b=>{
-    b.onclick = ()=>{ editingMotor = DB.ativosRG.find(r=>r.id===b.dataset.id); motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
-  });
-
-  document.querySelectorAll('.deleteMotorBtn').forEach(b=>{
-    b.onclick = async ()=>{
-      const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
-      if(motor && motor.status==='instalado'){ toast('Este RG está instalado em um TAG. Troque o motor no equipamento antes de excluir.'); return; }
-      if(!confirm('Excluir este motor definitivamente? O número de RG não será reutilizado.')) return;
-      DB.ativosRG = DB.ativosRG.filter(r=>r.id!==b.dataset.id);
-      await saveAll(KEYS.ativosRG, DB.ativosRG);
-      toast('Motor excluído'); renderView();
-    };
-  });
-
-  document.querySelectorAll('.motorStatusBtn').forEach(b=>{
-    b.onclick = async ()=>{
-      const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
-      if(!motor) return;
-      motor.status = b.dataset.status;
-      await saveAll(KEYS.ativosRG, DB.ativosRG);
-      toast('Status do motor atualizado para: ' + (STATUS_MOTOR[b.dataset.status]||b.dataset.status));
-      renderView();
-    };
-  });
-
-  const closeBtn = document.getElementById('closeMotorForm');
-  if(closeBtn) closeBtn.onclick = ()=>{ showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; renderView(); };
-
-  document.querySelectorAll('.quickFillBtn').forEach(b=>{
-    b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
-  });
-
-  const fotoEl = document.getElementById('mFoto');
-  if(fotoEl) fotoEl.onchange = (e)=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev)=>{
-      const img = new Image();
-      img.onload = ()=>{
-        const maxSize = 360;
-        let w = img.width, h = img.height;
-        if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
-        else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        pendingFotoMotorDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        captureMotorFormValues();
-        renderView();
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const saveBtn = document.getElementById('saveMotorBtn');
-  if(saveBtn) saveBtn.onclick = async ()=>{
-    captureMotorFormValues();
-    const nome = motorFormDraft.nome;
-    if(!nome){ toast('Preencha ao menos o nome do motor'); return; }
-    const dados = {
-      nome,
-      fabricante: motorFormDraft.fabricante, modelo: motorFormDraft.modelo, numeroSerie: motorFormDraft.numeroSerie,
-      placaIdentificacao: motorFormDraft.placaIdentificacao, localizacao: motorFormDraft.localizacao,
-      observacoes: motorFormDraft.observacoes, campos: {...motorFormDraft.campos},
-      foto: pendingFotoMotorDataUrl || (editingMotor ? editingMotor.foto : '') || ''
-    };
-    if(editingMotor){ Object.assign(editingMotor, dados); }
-    else {
-      DB.ativosRG.push({
-        id:uid(), tipo:'Motor', descricaoOutros:'', numeroRG: proximoNumeroRGMotor(),
-        status:'reserva', ativoId:null, historico:[],
-        ...dados, dataCadastro:new Date().toISOString()
-      });
-    }
-    await saveAll(KEYS.ativosRG, DB.ativosRG);
-    showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl='';
-    toast('Motor salvo'); renderView();
-  };
-}
-
 function attachAtivosEvents(){
   const tCad = document.getElementById('tabAtivosCadastro');
   if(tCad) tCad.onclick = ()=>{ ativosSubTab='cadastro'; renderView(); };
-  const tMotor = document.getElementById('tabAtivosMotor');
-  if(tMotor) tMotor.onclick = ()=>{ ativosSubTab='motor'; renderView(); };
   const tPes = document.getElementById('tabAtivosPesquisa');
   if(tPes) tPes.onclick = ()=>{ ativosSubTab='pesquisa'; renderView(); };
-
-  if(ativosSubTab==='motor'){ attachMotorCadastroEvents(); return; }
-
-  document.querySelectorAll('.motorFilhoBtn').forEach(b=>{
-    b.onclick = ()=>{ motorLinkAtivoId=b.dataset.id; motorLinkNovoTag=''; motorLinkSelecionadoId=''; renderView(); };
-  });
-  if(motorLinkAtivoId) attachMotorLinkEvents();
 
   const s = document.getElementById('ativoSearchInput');
   if(s) s.oninput = ()=>{ ativoSearch = s.value; renderView(); const el=document.getElementById('ativoSearchInput'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
@@ -1537,7 +1309,45 @@ function ativosMaisView(){
 }
 
 function salaMotoresSection(){
-  let html = `<div class="note" style="margin-bottom:10px">Equipamentos reserva (RG) — motores, motoredutores, redutores e bombas guardados como sobressalente, ainda não instalados em nenhum ativo.</div>`;
+  const motores = DB.ativosRG.filter(rg=>rg.tipo==='Motor');
+  const outrosRG = DB.ativosRG.filter(rg=>rg.tipo!=='Motor');
+
+  let html = `<h2 class="section-title" style="font-size:16px">Motores</h2>
+  <div class="note" style="margin-bottom:10px">Cada motor cadastrado aqui recebe um RG sequencial automático (M0001, M0002...). Você não escolhe o número.</div>
+  <button class="btn btn-primary" id="newMotorBtn">+ Novo motor</button>`;
+
+  if(showMotorForm) html += motorFormSheet();
+
+  if(motores.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum motor cadastrado ainda.</div>`; }
+  motores.slice().reverse().forEach(m=>{
+    const statusLabel = STATUS_MOTOR[m.status] || m.status;
+    const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
+    const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
+    html += `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
+      <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
+      <div class="desc">${m.nome}</div>
+      ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
+      ${instaladoEm?`<div class="meta"><span>📍 Instalado em: ${instaladoEm.codigo} — ${instaladoEm.nome}</span><span></span></div>`:`<div class="meta"><span>📍 ${m.localizacao||'Sala de Motores'}</span><span></span></div>`}
+      <div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>
+      ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
+      <div class="row-2" style="margin-top:8px">
+        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="conserto">Conserto</button>
+        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="descarte">Descarte</button>
+      </div>
+      <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
+      ${(m.status==='conserto'||m.status==='descarte')?`<button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Voltar para reserva</button>`:''}
+      <div class="row-2" style="margin-top:8px">
+        ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
+        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
+      </div>
+      <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}" style="margin-top:8px">Excluir</button>
+    </div></div>`;
+  });
+
+  if(motorMoveId) html += motorMoveSheet();
+
+  html += `<h2 class="section-title" style="font-size:16px;margin-top:22px">Outros equipamentos reserva</h2>
+  <div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros — cadastrados manualmente com RG próprio.</div>`;
   html += `<div class="card">
     <label>Tipo de equipamento</label>
     <select id="rgTipo">${TIPOS_RG.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
@@ -1546,7 +1356,7 @@ function salaMotoresSection(){
       <input id="rgOutrosDescricao" placeholder="Ex: Variador de frequência">
     </div>
     <label>Nome / Descrição</label>
-    <input id="rgNome" placeholder="Ex: Motor reserva 10 CV">
+    <input id="rgNome" placeholder="Ex: Redutor reserva">
     <label>Número de RG</label>
     <input id="rgNumero" placeholder="Ex: RG-0032">
     <label>Localização</label>
@@ -1556,15 +1366,12 @@ function salaMotoresSection(){
 
   html += `<div class="row-2"><button class="btn btn-outline btn-sm" id="exportRGBtn">Exportar lista (Excel)</button></div>`;
 
-  if(DB.ativosRG.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum equipamento reserva cadastrado.</div>`; }
-  DB.ativosRG.slice().reverse().forEach(rg=>{
-    const status = rg.status || 'reserva';
-    const instaladoEm = rg.ativoId ? DB.ativos.find(a=>a.id===rg.ativoId) : null;
-    html += `<div class="tag-card ${status==='atencao'?'alert':''}"><div class="inner">
+  if(outrosRG.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum outro equipamento reserva cadastrado.</div>`; }
+  outrosRG.slice().reverse().forEach(rg=>{
+    html += `<div class="tag-card"><div class="inner">
       <div class="row1"><span class="codigo">${rg.numeroRG}</span><span class="qtd" style="font-size:12px">${rg.tipo==='Outros'?(rg.descricaoOutros||'Outros'):rg.tipo}</span></div>
       <div class="desc">${rg.nome}</div>
-      ${rg.tipo==='Motor'?`<div class="meta"><span>${STATUS_MOTOR[status]||status}</span><span>Movimentado ${(rg.historico||[]).length}x</span></div>`:''}
-      <div class="meta"><span>📍 ${instaladoEm?('Instalado em '+instaladoEm.codigo):rg.localizacao}</span><span></span></div>
+      <div class="meta"><span>📍 ${rg.localizacao}</span><span></span></div>
       ${rg.fabricante||rg.modelo?`<div class="note">${rg.fabricante||''} ${rg.modelo?'· '+rg.modelo:''}</div>`:''}
       <button class="btn btn-danger btn-sm deleteRGBtn" data-id="${rg.id}" style="margin-top:8px">Excluir</button>
     </div></div>`;
@@ -1572,11 +1379,140 @@ function salaMotoresSection(){
   return html;
 }
 
+/* ---- Movimentar RG de motor para um ativo (TAG) já cadastrado ---- */
+function motorMoveSheet(){
+  const motor = DB.ativosRG.find(r=>r.id===motorMoveId);
+  if(!motor) return '';
+  const atuais = motor.ativoId ? DB.ativos.find(a=>a.id===motor.ativoId) : null;
+  const destinos = DB.ativos.filter(a=>a.ativo!==false && a.id!==(atuais?atuais.id:null));
+  return `
+  <div class="overlay" id="motorMoveOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Movimentar ${motor.numeroRG}</h2><button class="close" id="closeMotorMove">×</button></div>
+    <div class="note">${atuais?`Este RG está instalado em <b>${atuais.codigo} — ${atuais.nome}</b>.`:'Este RG está na Sala de Motores.'}</div>
+    <label>Para qual ativo (TAG) você quer movimentar este RG?</label>
+    <select id="motorMoveDestino">
+      <option value="">Selecione o ativo de destino...</option>
+      ${destinos.map(d=>`<option value="${d.id}" ${motorMoveDestino===d.id?'selected':''}>${d.codigo} — ${d.nome}${d.motorInstaladoId?' (já tem motor instalado)':''}</option>`).join('')}
+    </select>
+    <div class="note" style="color:var(--amber)">Se o ativo escolhido já tiver outro motor instalado, os dois trocam de lugar: o motor atual dele vai para a Sala de Motores com status "Aguardando decisão".</div>
+    <button class="btn btn-primary" id="confirmMotorMoveBtn">Confirmar movimentação</button>
+  </div></div>`;
+}
+
 function attachAtivosMaisEvents(){
   const tImp = document.getElementById('tabAtivosImportar'); if(tImp) tImp.onclick = ()=>{ ativosMaisTab='importar'; renderView(); };
   const tSala = document.getElementById('tabSalaMotores'); if(tSala) tSala.onclick = ()=>{ ativosMaisTab='salamotores'; renderView(); };
 
   if(ativosMaisTab==='salamotores'){
+    const newBtn = document.getElementById('newMotorBtn');
+    if(newBtn) newBtn.onclick = ()=>{ editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
+
+    document.querySelectorAll('.editMotorBtn').forEach(b=>{
+      b.onclick = ()=>{ editingMotor = DB.ativosRG.find(r=>r.id===b.dataset.id); motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
+    });
+
+    document.querySelectorAll('.deleteMotorBtn').forEach(b=>{
+      b.onclick = async ()=>{
+        const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
+        if(motor && motor.status==='instalado'){ toast('Este RG está instalado em um TAG. Movimente o motor antes de excluir.'); return; }
+        if(!confirm('Excluir este motor definitivamente? O número de RG não será reutilizado.')) return;
+        DB.ativosRG = DB.ativosRG.filter(r=>r.id!==b.dataset.id);
+        await saveAll(KEYS.ativosRG, DB.ativosRG);
+        toast('Motor excluído'); renderView();
+      };
+    });
+
+    document.querySelectorAll('.motorStatusBtn').forEach(b=>{
+      b.onclick = async ()=>{
+        const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
+        if(!motor) return;
+        motor.status = b.dataset.status;
+        await saveAll(KEYS.ativosRG, DB.ativosRG);
+        toast('Status do motor atualizado para: ' + (STATUS_MOTOR[b.dataset.status]||b.dataset.status));
+        renderView();
+      };
+    });
+
+    const closeMotorBtn = document.getElementById('closeMotorForm');
+    if(closeMotorBtn) closeMotorBtn.onclick = ()=>{ showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; renderView(); };
+
+    document.querySelectorAll('.quickFillBtn').forEach(b=>{
+      b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
+    });
+
+    const fotoEl = document.getElementById('mFoto');
+    if(fotoEl) fotoEl.onchange = (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const maxSize = 360;
+          let w = img.width, h = img.height;
+          if(w>h && w>maxSize){ h = h*(maxSize/w); w = maxSize; }
+          else if(h>=w && h>maxSize){ w = w*(maxSize/h); h = maxSize; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          pendingFotoMotorDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          captureMotorFormValues();
+          renderView();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const saveMotorBtn = document.getElementById('saveMotorBtn');
+    if(saveMotorBtn) saveMotorBtn.onclick = async ()=>{
+      captureMotorFormValues();
+      const nome = motorFormDraft.nome;
+      if(!nome){ toast('Preencha ao menos o nome do motor'); return; }
+      const dados = {
+        nome,
+        fabricante: motorFormDraft.fabricante, modelo: motorFormDraft.modelo, numeroSerie: motorFormDraft.numeroSerie,
+        placaIdentificacao: motorFormDraft.placaIdentificacao, localizacao: motorFormDraft.localizacao,
+        observacoes: motorFormDraft.observacoes, campos: {...motorFormDraft.campos},
+        foto: pendingFotoMotorDataUrl || (editingMotor ? editingMotor.foto : '') || ''
+      };
+      if(editingMotor){ Object.assign(editingMotor, dados); }
+      else {
+        DB.ativosRG.push({
+          id:uid(), tipo:'Motor', descricaoOutros:'', numeroRG: proximoNumeroRGMotor(),
+          status:'reserva', ativoId:null, historico:[],
+          ...dados, dataCadastro:new Date().toISOString()
+        });
+      }
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl='';
+      toast('Motor salvo'); renderView();
+    };
+
+    document.querySelectorAll('.motorMoveBtn').forEach(b=>{
+      b.onclick = ()=>{ motorMoveId=b.dataset.id; motorMoveDestino=''; renderView(); };
+    });
+
+    const closeMoveBtn = document.getElementById('closeMotorMove');
+    if(closeMoveBtn) closeMoveBtn.onclick = ()=>{ motorMoveId=null; motorMoveDestino=''; renderView(); };
+
+    const moveDestinoSel = document.getElementById('motorMoveDestino');
+    if(moveDestinoSel) moveDestinoSel.onchange = ()=>{ motorMoveDestino = moveDestinoSel.value; };
+
+    const confirmMoveBtn = document.getElementById('confirmMotorMoveBtn');
+    if(confirmMoveBtn) confirmMoveBtn.onclick = async ()=>{
+      const destinoId = (document.getElementById('motorMoveDestino')||{}).value;
+      if(!destinoId){ toast('Selecione o ativo de destino'); return; }
+      const destino = DB.ativos.find(a=>a.id===destinoId);
+      if(!destino) return;
+      if(destino.motorInstaladoId && !confirm('Este ativo já tem um motor instalado. Ao confirmar, o motor atual dele volta para a Sala de Motores com status "Aguardando decisão". Continuar?')) return;
+      movimentarRGParaAtivo(motorMoveId, destino);
+      await saveAll(KEYS.ativos, DB.ativos);
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      motorMoveId=null; motorMoveDestino='';
+      toast('Motor movimentado'); renderView();
+    };
+
     const tipoSel = document.getElementById('rgTipo');
     const outrosWrap = document.getElementById('rgOutrosWrap');
     if(tipoSel) tipoSel.onchange = ()=>{ if(outrosWrap) outrosWrap.classList.toggle('hidden', tipoSel.value!=='Outros'); };
@@ -1598,7 +1534,7 @@ function attachAtivosMaisEvents(){
     document.querySelectorAll('.deleteRGBtn').forEach(b=>{
       b.onclick = async ()=>{
         const rg = DB.ativosRG.find(r=>r.id===b.dataset.id);
-        if(rg && rg.status==='instalado'){ toast('Este RG está instalado em um TAG. Troque o motor no equipamento antes de excluir.'); return; }
+        if(rg && rg.status==='instalado'){ toast('Este RG está instalado em um TAG. Movimente o motor antes de excluir.'); return; }
         if(!confirm('Excluir este equipamento reserva definitivamente?')) return;
         DB.ativosRG = DB.ativosRG.filter(rg=>rg.id!==b.dataset.id);
         await saveAll(KEYS.ativosRG, DB.ativosRG);
