@@ -672,6 +672,54 @@ const TIPO_CAMPOS_ESPECIFICOS = {
   'Máquina': MAQUINA_FIELDS, 'Compressor': MAQUINA_FIELDS, 'Painel Elétrico': MAQUINA_FIELDS, 'Outro': MAQUINA_FIELDS
 };
 const CRITICIDADES = [{v:'A',l:'A — Alta'},{v:'B',l:'B — Média'},{v:'C',l:'C — Baixa'}];
+
+// Matriz de criticidade de ativos (base RCM): cada critério tem opções com pontuação.
+// A soma das respostas gera uma classificação sugerida (A/B/C), que serve de apoio à decisão —
+// o campo final de criticidade continua editável manualmente por cima da sugestão.
+const CRITERIOS_CRITICIDADE = [
+  {id:'impactoProducao', label:'Impacto na produção se quebrar', opcoes:[
+    {v:1,l:'Sem impacto — não afeta a produção'},
+    {v:2,l:'Reduz a capacidade, mas a produção continua'},
+    {v:3,l:'Para a linha ou o setor'},
+    {v:4,l:'Para toda a planta'},
+  ]},
+  {id:'redundancia', label:'Tem equipamento reserva disponível?', opcoes:[
+    {v:1,l:'Sim, substituição imediata'},
+    {v:2,l:'Sim, mas leva tempo para substituir'},
+    {v:3,l:'Não tem reserva'},
+  ]},
+  {id:'seguranca', label:'Risco à segurança das pessoas', opcoes:[
+    {v:1,l:'Nenhum'},
+    {v:2,l:'Baixo'},
+    {v:3,l:'Alto'},
+  ]},
+  {id:'meioAmbiente', label:'Risco ambiental', opcoes:[
+    {v:1,l:'Nenhum'},
+    {v:2,l:'Baixo'},
+    {v:3,l:'Alto'},
+  ]},
+  {id:'custoReparo', label:'Custo/dificuldade de reparo ou substituição', opcoes:[
+    {v:1,l:'Baixo'},
+    {v:2,l:'Médio'},
+    {v:3,l:'Alto'},
+  ]},
+  {id:'frequenciaFalha', label:'Frequência de falha (histórico)', opcoes:[
+    {v:1,l:'Rara — raramente quebra'},
+    {v:2,l:'Ocasional — quebra de vez em quando'},
+    {v:3,l:'Frequente — quebra com frequência'},
+  ]},
+];
+const CRITICIDADE_SCORE_MIN = CRITERIOS_CRITICIDADE.reduce((s,c)=>s+c.opcoes[0].v,0);
+const CRITICIDADE_SCORE_MAX = CRITERIOS_CRITICIDADE.reduce((s,c)=>s+c.opcoes[c.opcoes.length-1].v,0);
+
+function calcularCriticidade(respostas){
+  const preenchidos = CRITERIOS_CRITICIDADE.filter(c=>respostas && respostas[c.id]);
+  if(preenchidos.length < CRITERIOS_CRITICIDADE.length) return {score:null, classe:null, completo:false};
+  const score = CRITERIOS_CRITICIDADE.reduce((s,c)=>s+(Number(respostas[c.id])||0),0);
+  let classe = 'C';
+  if(score>=15) classe='A'; else if(score>=10) classe='B';
+  return {score, classe, completo:true};
+}
 const CAMPOS_COMPLETUDE_ATIVO = ['codigo','nome','tipo','fabricante','modelo','numeroSerie','placaIdentificacao','localizacao','criticidade','foto'];
 const SALA_MOTORES = '__SALA_MOTORES__';
 const TIPOS_RG = ['Motoredutor','Motobomba','Redutor','Bomba','Outros'];
@@ -868,7 +916,7 @@ function initAtivoFormDraft(base){
     fabricante: base.fabricante||'', modelo: base.modelo||'', numeroSerie: base.numeroSerie||'',
     placaIdentificacao: base.placaIdentificacao||'', localizacao: base.localizacao||'',
     criticidade: base.criticidade||'', observacoes: base.observacoes||'', foto: base.foto||'', foto2: base.foto2||'',
-    campos: {...(base.campos||{})}
+    campos: {...(base.campos||{})}, matrizCriticidade: {...(base.matrizCriticidade||{})}
   };
 }
 
@@ -885,6 +933,7 @@ function captureAtivoFormValues(){
   if(g('aLocalizacao')!==undefined) ativoFormDraft.localizacao = g('aLocalizacao').trim();
   if(g('aCriticidade')!==undefined) ativoFormDraft.criticidade = g('aCriticidade');
   if(g('aObservacoes')!==undefined) ativoFormDraft.observacoes = g('aObservacoes').trim();
+  CRITERIOS_CRITICIDADE.forEach(c=>{ const v = g('acrit-'+c.id); if(v!==undefined) ativoFormDraft.matrizCriticidade[c.id] = v; });
   const especificos = (ativoFormDraft.tipo && TIPO_CAMPOS_ESPECIFICOS[ativoFormDraft.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[ativoFormDraft.tipo] : [];
   especificos.forEach(f=>{ const v = g('campo-'+f.id); if(v!==undefined) ativoFormDraft.campos[f.id] = v.trim(); });
 }
@@ -1225,6 +1274,19 @@ function ativoFormSheet(){
     <input id="aLocalizacao" value="${a.localizacao}" placeholder="Ex: Setor produção, linha 2">
 
     <label>Criticidade do ativo</label>
+    <div class="note">Responda os critérios abaixo para o sistema sugerir a classificação. Você pode ajustar o resultado final manualmente.</div>
+    ${CRITERIOS_CRITICIDADE.map(c=>`
+      <label>${c.label}</label>
+      <select id="acrit-${c.id}">
+        <option value="">Não avaliado</option>
+        ${c.opcoes.map(o=>`<option value="${o.v}" ${String((a.matrizCriticidade||{})[c.id])===String(o.v)?'selected':''}>${o.l}</option>`).join('')}
+      </select>
+    `).join('')}
+    ${(()=>{ const r = calcularCriticidade(a.matrizCriticidade); return r.completo
+      ? `<div class="note" style="color:var(--amber)">Pontuação: ${r.score} de ${CRITICIDADE_SCORE_MAX} — classificação sugerida: <span class="pill ${r.classe}">${r.classe}</span></div>`
+      : `<div class="note">Responda todos os critérios acima para calcular a sugestão.</div>`; })()}
+
+    <label style="margin-top:10px">Classificação final</label>
     <select id="aCriticidade"><option value="">Não classificado</option>${CRITICIDADES.map(c=>`<option value="${c.v}" ${a.criticidade===c.v?'selected':''}>${c.l}</option>`).join('')}</select>
 
     <label>Observações</label>
@@ -1444,6 +1506,16 @@ function attachAtivosEvents(){
     renderView();
   };
 
+  CRITERIOS_CRITICIDADE.forEach(c=>{
+    const sel = document.getElementById('acrit-'+c.id);
+    if(sel) sel.onchange = ()=>{
+      captureAtivoFormValues();
+      const r = calcularCriticidade(ativoFormDraft.matrizCriticidade);
+      if(r.completo) ativoFormDraft.criticidade = r.classe;
+      renderView();
+    };
+  });
+
   document.querySelectorAll('.quickFillBtn').forEach(b=>{
     b.onclick = ()=>{ const f = document.getElementById(b.dataset.field); if(f) f.value = b.dataset.value; };
   });
@@ -1531,6 +1603,7 @@ function attachAtivosEvents(){
       placaIdentificacao: ativoFormDraft.placaIdentificacao,
       localizacao: ativoFormDraft.localizacao,
       criticidade: ativoFormDraft.criticidade,
+      matrizCriticidade: {...ativoFormDraft.matrizCriticidade},
       observacoes: ativoFormDraft.observacoes,
       campos: {...ativoFormDraft.campos},
       foto: pendingFotoAtivoDataUrl || (editingAtivo ? editingAtivo.foto : '') || '',
