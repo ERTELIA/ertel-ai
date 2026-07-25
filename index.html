@@ -1665,6 +1665,16 @@ function ativosMaisView(){
     <button class="btn btn-outline btn-sm" id="exportAtivosBtn">Exportar ativos cadastrados</button>
   </div>
 
+  <h2 class="section-title" style="margin-top:20px">Relatórios</h2>
+  <div class="card">
+    <div class="note">Lista de ativos cadastrados com TAG pai, TAG filho e descrição — mostra a hierarquia completa em ordem.</div>
+    <button class="btn btn-outline btn-sm" id="exportAtivosPaiFilhoBtn">📄 Lista de Ativos — TAG Pai e Filho</button>
+  </div>
+  <div class="card">
+    <div class="note">Lista de todos os RG — motores (M) e equipamentos em geral (E) — com a localização atual ou o local de instalação de cada um.</div>
+    <button class="btn btn-outline btn-sm" id="exportRGLocalizacaoBtn">📄 Lista de RG — Motores e Equipamentos</button>
+  </div>
+
   <div id="importAtivosFormatModalHolder"></div>`;
   return html;
 }
@@ -2211,6 +2221,12 @@ function attachAtivosMaisEvents(){
     const incluirHierarquia = document.getElementById('incluirHierarquiaExportChk').checked;
     exportAtivosXlsx(incluirHierarquia);
   };
+
+  const exportPaiFilhoBtn = document.getElementById('exportAtivosPaiFilhoBtn');
+  if(exportPaiFilhoBtn) exportPaiFilhoBtn.onclick = exportAtivosPaiFilhoXlsx;
+
+  const exportRGLocBtn = document.getElementById('exportRGLocalizacaoBtn');
+  if(exportRGLocBtn) exportRGLocBtn.onclick = exportRGLocalizacaoXlsx;
 }
 
 function exportManutencaoXlsx(){
@@ -2428,6 +2444,76 @@ function exportAtivoPdf(ativoId){
   }
 
   doc.save(`ficha-tecnica-${ativo.codigo}.pdf`);
+}
+
+// Ordena os ativos em ordem hierárquica (pai antes dos filhos, filhos logo abaixo do pai),
+// com o nível de profundidade de cada um — usado no relatório de TAG pai/filho.
+function ordenarAtivosHierarquia(){
+  const ativos = DB.ativos.filter(a=>a.ativo!==false);
+  const porPai = {};
+  ativos.forEach(a=>{ const p=a.ativoPaiId||''; (porPai[p]=porPai[p]||[]).push(a); });
+  const ordenados = [];
+  function visitar(paiId, nivel){
+    (porPai[paiId]||[]).slice().sort((a,b)=>a.codigo.localeCompare(b.codigo)).forEach(a=>{
+      ordenados.push({ativo:a, nivel});
+      visitar(a.id, nivel+1);
+    });
+  }
+  visitar('', 0);
+  return ordenados;
+}
+
+function exportAtivosPaiFilhoXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const ordenados = ordenarAtivosHierarquia();
+  if(ordenados.length===0){ toast('Nenhum ativo cadastrado'); return; }
+  const rows = ordenados.map(({ativo:a, nivel})=>{
+    const pai = a.ativoPaiId ? DB.ativos.find(x=>x.id===a.ativoPaiId) : null;
+    return {
+      'Nível': nivel===0 ? 'Raiz (sem pai)' : 'Filho — nível '+nivel,
+      'TAG': a.codigo,
+      'Descrição': a.nome,
+      'Tipo': a.tipo||'',
+      'TAG Pai': pai ? pai.codigo : '—',
+      'Descrição do Pai': pai ? pai.nome : '',
+      'Localização': a.localizacao||''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Ativos - Pai e Filho');
+  XLSX.writeFile(wb, `ativos-pai-filho-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function exportRGLocalizacaoXlsx(){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const rgs = DB.ativosRG.slice().sort((a,b)=>{
+    const ga = a.tipo==='Motor' ? 0 : 1;
+    const gb = b.tipo==='Motor' ? 0 : 1;
+    if(ga!==gb) return ga-gb;
+    return (a.numeroRG||'').localeCompare(b.numeroRG||'');
+  });
+  if(rgs.length===0){ toast('Nenhum RG cadastrado'); return; }
+  const rows = rgs.map(rg=>{
+    const instaladoEm = rg.ativoId ? DB.ativos.find(a=>a.id===rg.ativoId) : null;
+    const localAtual = instaladoEm
+      ? `Instalado em ${instaladoEm.codigo} — ${instaladoEm.nome} (${instaladoEm.localizacao||'sem localização'})`
+      : (rg.localizacao||'Sala de Motores');
+    return {
+      'RG': rg.numeroRG,
+      'Prefixo': (rg.numeroRG||'')[0]==='M' ? 'M — Motor' : 'E — Equipamento',
+      'Tipo': rg.tipo==='Outros' ? (rg.descricaoOutros||'Outros') : rg.tipo,
+      'Descrição': rg.nome,
+      'Status': STATUS_MOTOR[rg.status||'reserva'] || rg.status,
+      'Localização / Local de Instalação': localAtual,
+      'Fabricante': rg.fabricante||'',
+      'Modelo': rg.modelo||''
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'RG - Motores e Equipamentos');
+  XLSX.writeFile(wb, `rg-motores-equipamentos-${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function exportAtivosXlsx(incluirHierarquia){
