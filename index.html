@@ -674,7 +674,7 @@ const TIPO_CAMPOS_ESPECIFICOS = {
 const CRITICIDADES = [{v:'A',l:'A — Alta'},{v:'B',l:'B — Média'},{v:'C',l:'C — Baixa'}];
 const CAMPOS_COMPLETUDE_ATIVO = ['codigo','nome','tipo','fabricante','modelo','numeroSerie','placaIdentificacao','localizacao','criticidade','foto'];
 const SALA_MOTORES = '__SALA_MOTORES__';
-const TIPOS_RG = ['Motoredutor','Redutor','Bomba','Outros'];
+const TIPOS_RG = ['Motoredutor','Motobomba','Redutor','Bomba','Outros'];
 const QUICK_NA = ['Não se aplica','Sem informação'];
 const QUICK_PLACA = ['Sem placa de identificação','Placa ilegível'];
 
@@ -995,7 +995,7 @@ function ativosListView(){
 }
 
 /* ---- Movimentação de RG de motor entre Sala de Motores e um TAG existente ---- */
-const TIPO_RG_PARA_ATIVO = {Motor:'Motor', Motoredutor:'Motoredutor', Redutor:'Redutor', Bomba:'Bomba', Outros:'Outro'};
+const TIPO_RG_PARA_ATIVO = {Motor:'Motor', Motoredutor:'Motoredutor', Motobomba:'Motobomba', Redutor:'Redutor', Bomba:'Bomba', Outros:'Outro'};
 
 function movimentarRGParaAtivo(motorId, destinoAtivo){
   const novo = DB.ativosRG.find(r=>r.id===motorId);
@@ -1720,16 +1720,19 @@ function motorMoveSheet(){
   const motor = DB.ativosRG.find(r=>r.id===motorMoveId);
   if(!motor) return '';
   const atuais = motor.ativoId ? DB.ativos.find(a=>a.id===motor.ativoId) : null;
-  const destinos = DB.ativos.filter(a=>a.ativo!==false && a.id!==(atuais?atuais.id:null));
+  const categoriaRG = TIPO_RG_PARA_ATIVO[motor.tipo] || motor.tipo;
+  const destinos = DB.ativos.filter(a=>a.ativo!==false && a.id!==(atuais?atuais.id:null) && (!a.tipo || a.tipo===categoriaRG));
   return `
   <div class="overlay" id="motorMoveOverlay"><div class="sheet">
     <div class="sheet-head"><h2 class="section-title" style="margin:0">Movimentar ${motor.numeroRG}</h2><button class="close" id="closeMotorMove">×</button></div>
     <div class="note">${atuais?`Este RG está instalado em <b>${atuais.codigo} — ${atuais.nome}</b>.`:'Este RG está na Sala de Motores.'}</div>
+    <div class="note">Por segurança, só aparecem TAGs do tipo <b>${categoriaRG}</b> (ou sem tipo definido ainda) — um ${categoriaRG.toLowerCase()} só pode trocar de posição com outro ${categoriaRG.toLowerCase()}.</div>
     <label>Para qual ativo (TAG) você quer movimentar este RG?</label>
     <select id="motorMoveDestino">
       <option value="">Selecione o ativo de destino...</option>
       ${destinos.map(d=>`<option value="${d.id}" ${motorMoveDestino===d.id?'selected':''}>${d.codigo} — ${d.nome}${d.motorInstaladoId?' (já tem item instalado)':''}</option>`).join('')}
     </select>
+    ${destinos.length===0?`<div class="note" style="color:var(--brick)">Nenhum TAG compatível encontrado. Crie um ativo do tipo ${categoriaRG} em Cadastro de Ativos primeiro.</div>`:''}
     <div class="note" style="color:var(--amber)">Se o ativo escolhido já tiver outro item instalado, os dois trocam de lugar: o item atual dele vai para a Sala de Motores com status "Aguardando decisão".</div>
     <button class="btn btn-primary" id="confirmMotorMoveBtn">Confirmar movimentação</button>
   </div></div>`;
@@ -1912,6 +1915,9 @@ function attachAtivosMaisEvents(){
       if(!destinoId){ toast('Selecione o ativo de destino'); return; }
       const destino = DB.ativos.find(a=>a.id===destinoId);
       if(!destino) return;
+      const motorAMover = DB.ativosRG.find(r=>r.id===motorMoveId);
+      const categoriaRG = motorAMover ? (TIPO_RG_PARA_ATIVO[motorAMover.tipo] || motorAMover.tipo) : null;
+      if(categoriaRG && destino.tipo && destino.tipo!==categoriaRG){ toast('Tipo incompatível: este RG só pode ser movimentado para um TAG do tipo '+categoriaRG+'.'); return; }
       if(destino.motorInstaladoId && !confirm('Este ativo já tem um motor instalado. Ao confirmar, o motor atual dele volta para a Sala de Motores com status "Aguardando decisão". Continuar?')) return;
       movimentarRGParaAtivo(motorMoveId, destino);
       await saveAll(KEYS.ativos, DB.ativos);
