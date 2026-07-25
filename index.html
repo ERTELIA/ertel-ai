@@ -569,6 +569,7 @@ function resetModuleUiState(){
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
   showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
+  showEquipForm=false; editingEquip=null; equipFormDraft=null;
   motorConsertoEnvioId=null; motorConsertoRetornoId=null; motorHistoricoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
 }
@@ -829,6 +830,7 @@ function getDescendentesIds(ativoId){
 
 let ativosSubTab = 'cadastro';
 let showMotorForm = false, editingMotor = null, motorFormDraft = null, pendingFotoMotorDataUrl = '';
+let showEquipForm = false, editingEquip = null, equipFormDraft = null;
 let motorMoveId = null, motorMoveDestino = '';
 let motorConsertoEnvioId = null, motorConsertoRetornoId = null;
 let motorHistoricoId = null;
@@ -961,7 +963,7 @@ function ativosListView(){
         ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
         ${pai && (buscaAtiva || !visualizacaoArvoreAtivos)?`<div class="note">Filho de: ${pai.codigo} — ${pai.nome}</div>`:''}
         ${filhos.length>0?`<div class="note">${filhos.length} ativo${filhos.length>1?'s':''} filho${filhos.length>1?'s':''}</div>`:''}
-        ${a.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===a.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE">⚙️ Motor instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
+        ${a.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===a.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE">⚙️ ${m.tipo==='Motor'?'Motor':'Equipamento'} instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
         ${isAdmin?`<div class="row-2" style="margin-top:10px">
           <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
           <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${a.id}">+ Adicionar filho</button>
@@ -993,11 +995,13 @@ function ativosListView(){
 }
 
 /* ---- Movimentação de RG de motor entre Sala de Motores e um TAG existente ---- */
+const TIPO_RG_PARA_ATIVO = {Motor:'Motor', Motoredutor:'Motoredutor', Redutor:'Redutor', Bomba:'Bomba', Outros:'Outro'};
+
 function movimentarRGParaAtivo(motorId, destinoAtivo){
   const novo = DB.ativosRG.find(r=>r.id===motorId);
   if(!novo || !destinoAtivo) return;
 
-  // Se este motor já estava instalado em outro TAG, libera o TAG antigo dele.
+  // Se este RG já estava instalado em outro TAG, libera o TAG antigo dele.
   if(novo.ativoId && novo.ativoId!==destinoAtivo.id){
     const tagAntigo = DB.ativos.find(a=>a.id===novo.ativoId);
     if(tagAntigo && tagAntigo.motorInstaladoId===novo.id) tagAntigo.motorInstaladoId = null;
@@ -1020,7 +1024,7 @@ function movimentarRGParaAtivo(motorId, destinoAtivo){
   if(!novo.historico) novo.historico = [];
   novo.historico.push({ativoId:destinoAtivo.id, ativoCodigo:destinoAtivo.codigo, dataEntrada:new Date().toISOString(), dataSaida:null});
   destinoAtivo.motorInstaladoId = novo.id;
-  destinoAtivo.tipo = 'Motor';
+  destinoAtivo.tipo = TIPO_RG_PARA_ATIVO[novo.tipo] || novo.tipo;
   destinoAtivo.fabricante = novo.fabricante||'';
   destinoAtivo.modelo = novo.modelo||'';
   destinoAtivo.numeroSerie = novo.numeroSerie||'';
@@ -1138,6 +1142,40 @@ function captureMotorFormValues(){
   if(g('mLocalizacao')!==undefined) motorFormDraft.localizacao = g('mLocalizacao').trim();
   if(g('mObservacoes')!==undefined) motorFormDraft.observacoes = g('mObservacoes').trim();
   MOTOR_FIELDS.forEach(f=>{ const v = g('mcampo-'+f.id); if(v!==undefined) motorFormDraft.campos[f.id] = v.trim(); });
+}
+
+function equipFormSheet(){
+  const e = editingEquip;
+  if(!e) return '';
+  return `
+  <div class="overlay" id="equipOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Editar equipamento — ${e.numeroRG}</h2><button class="close" id="closeEquipForm">×</button></div>
+
+    <label>Tipo de equipamento</label>
+    <select id="eTipo">${TIPOS_RG.map(t=>`<option value="${t}" ${e.tipo===t?'selected':''}>${t}</option>`).join('')}</select>
+    <div id="eOutrosWrap" class="${e.tipo==='Outros'?'':'hidden'}">
+      <label>Descrever o tipo</label>
+      <input id="eOutrosDescricao" value="${e.descricaoOutros||''}" placeholder="Ex: Variador de frequência">
+    </div>
+
+    <label>Nome / Descrição</label>
+    <input id="eNome" value="${e.nome||''}" placeholder="Ex: Redutor reserva">
+
+    <label>Fabricante</label>
+    <input id="eFabricante" value="${e.fabricante||''}" placeholder="Ex: SEW">
+    <label>Modelo</label>
+    <input id="eModelo" value="${e.modelo||''}" placeholder="Ex: R57">
+    <label>Número de série</label>
+    <input id="eNumeroSerie" value="${e.numeroSerie||''}" placeholder="Ex: SN123456">
+
+    <label>Localização</label>
+    <input id="eLocalizacao" value="${e.localizacao||''}" placeholder="Ex: Sala de Motores - Prateleira 2">
+
+    <label>Observações</label>
+    <textarea id="eObservacoes" rows="3" placeholder="Observações gerais">${e.observacoes||''}</textarea>
+
+    <button class="btn btn-primary" id="saveEquipBtn">Salvar alterações</button>
+  </div></div>`;
 }
 
 function motorFormSheet(){
@@ -1438,19 +1476,24 @@ function ativosMaisView(){
 
 function salaMotoresSection(){
   const motores = DB.ativosRG.filter(rg=>rg.tipo==='Motor');
-  const outrosRG = DB.ativosRG.filter(rg=>rg.tipo!=='Motor');
-  const motoresReserva = motores.filter(m=>m.status==='reserva' || m.status==='atencao');
+  const outros = DB.ativosRG.filter(rg=>rg.tipo!=='Motor');
+  const motoresReserva = motores.filter(m=>(m.status||'reserva')==='reserva' || m.status==='atencao');
   const motoresInstalados = motores.filter(m=>m.status==='instalado');
   const motoresConserto = motores.filter(m=>m.status==='conserto' || m.status==='descarte');
+  const equipReserva = outros.filter(m=>(m.status||'reserva')==='reserva' || m.status==='atencao');
+  const equipInstalados = outros.filter(m=>m.status==='instalado');
+  const equipConserto = outros.filter(m=>m.status==='conserto' || m.status==='descarte');
 
   const busca = salaMotoresBusca.trim().toLowerCase();
   const bate = rg => !busca || [rg.nome, rg.modelo, rg.fabricante, rg.numeroRG].some(v=>(v||'').toLowerCase().includes(busca));
 
   let html = `<div class="tabs-wrap">
-    <button class="btn ${salaMotoresTab==='equipamentos'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipReserva">Equipamentos reserva (${outrosRG.length})</button>
+    <button class="btn ${salaMotoresTab==='equipamentos'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipReserva">Equipamentos reserva (${equipReserva.length})</button>
+    <button class="btn ${salaMotoresTab==='equipInstalados'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipInstalados">Equipamentos instalados (${equipInstalados.length})</button>
+    <button class="btn ${salaMotoresTab==='equipConserto'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipConserto">Equip. conserto/descarte (${equipConserto.length})</button>
     <button class="btn ${salaMotoresTab==='motoresReserva'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresReserva">Motores reserva (${motoresReserva.length})</button>
     <button class="btn ${salaMotoresTab==='motoresInstalados'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresInstalados">Motores instalados (${motoresInstalados.length})</button>
-    <button class="btn ${salaMotoresTab==='motoresConserto'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresConserto">Conserto / Descarte (${motoresConserto.length})</button>
+    <button class="btn ${salaMotoresTab==='motoresConserto'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresConserto">Motores conserto/descarte (${motoresConserto.length})</button>
   </div>`;
 
   html += `<div class="search"><input id="salaMotoresBuscaInput" placeholder="Buscar por nome, modelo, fabricante ou RG" value="${salaMotoresBusca}"></div>`;
@@ -1494,8 +1537,31 @@ function salaMotoresSection(){
     return html;
   }
 
-  // salaMotoresTab === 'equipamentos'
-  html += `<div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros. Cada um recebe um RG sequencial automático (E0001, E0002...). Ao chegar em E9999, o próximo passa a ser E0001-01, E0002-01... — você não escolhe o número.</div>`;
+  if(salaMotoresTab==='equipInstalados'){
+    const lista = equipInstalados.filter(bate);
+    if(lista.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum equipamento instalado encontrado.</div>`; }
+    html += `<div class="card-grid">`;
+    lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
+    html += `</div>`;
+    if(motorMoveId) html += motorMoveSheet();
+    if(motorHistoricoId) html += historicoSheet();
+    return html;
+  }
+
+  if(salaMotoresTab==='equipConserto'){
+    html += `<div class="note" style="margin-bottom:10px">Equipamentos enviados para conserto (aguardando retorno) ou descartados. Fica separado da reserva disponível para instalação.</div>`;
+    const lista = equipConserto.filter(bate);
+    if(lista.length===0){ html += `<div class="empty"><div class="icon">🔧</div>Nenhum equipamento em conserto ou descartado.</div>`; }
+    html += `<div class="card-grid">`;
+    lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
+    html += `</div>`;
+    if(motorConsertoRetornoId) html += consertoRetornoSheet();
+    if(motorHistoricoId) html += historicoSheet();
+    return html;
+  }
+
+  // salaMotoresTab === 'equipamentos' (reserva)
+  html += `<div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros. Cada um recebe um RG sequencial automático (E0001, E0002...). Ao chegar em E9999, o próximo passa a ser E0001-01, E0002-01... — você não escolhe o número. Seguem a mesma lógica dos motores: movimentar para um TAG, enviar para conserto e histórico com custo e MTBF.</div>`;
   html += `<div class="card">
     <label>Tipo de equipamento</label>
     <select id="rgTipo">${TIPOS_RG.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
@@ -1510,35 +1576,33 @@ function salaMotoresSection(){
     <input id="rgLocalizacao" placeholder="Ex: Sala de Motores - Prateleira 2" value="Sala de Motores">
     <button class="btn btn-primary btn-sm" id="addRGBtn">Adicionar à Sala de Motores</button>
   </div>`;
+  if(showEquipForm) html += equipFormSheet();
 
   html += `<div class="row-2"><button class="btn btn-outline btn-sm" id="exportRGBtn">Exportar lista (Excel)</button></div>`;
 
-  const listaOutros = outrosRG.filter(bate);
-  if(listaOutros.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum equipamento reserva encontrado.</div>`; }
+  const listaEquip = equipReserva.filter(bate);
+  if(listaEquip.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum equipamento reserva encontrado.</div>`; }
   html += `<div class="card-grid">`;
-  listaOutros.slice().reverse().forEach(rg=>{
-    html += `<div class="tag-card"><div class="inner">
-      <div class="row1"><span class="codigo">${rg.numeroRG}</span><span class="qtd" style="font-size:12px">${rg.tipo==='Outros'?(rg.descricaoOutros||'Outros'):rg.tipo}</span></div>
-      <div class="desc">${rg.nome}</div>
-      <div class="meta"><span>📍 ${rg.localizacao}</span><span></span></div>
-      ${rg.fabricante||rg.modelo?`<div class="note">${rg.fabricante||''} ${rg.modelo?'· '+rg.modelo:''}</div>`:''}
-      <button class="btn btn-danger btn-sm deleteRGBtn" data-id="${rg.id}" style="margin-top:8px">Excluir</button>
-    </div></div>`;
-  });
+  listaEquip.slice().reverse().forEach(m=>{ html += motorCard(m); });
   html += `</div>`;
+  if(motorMoveId) html += motorMoveSheet();
+  if(motorConsertoEnvioId) html += consertoEnvioSheet();
+  if(motorHistoricoId) html += historicoSheet();
   return html;
 }
 
 function motorCard(m){
-  const statusLabel = STATUS_MOTOR[m.status] || m.status;
-  const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
+  const status = m.status || 'reserva';
+  const statusLabel = STATUS_MOTOR[status] || status;
+  const corPill = status==='instalado' ? 'A' : (status==='atencao' ? 'B' : (status==='conserto' ? 'C' : ''));
   const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
   const qtdConsertos = motorQtdConsertos(m);
   const custoTotal = motorCustoTotalConserto(m);
   const mtbf = motorMTBFDias(m);
   const consertoAberto = motorConsertoAberto(m);
+  const descartadoLabel = m.tipo==='Motor' ? 'Motor descartado.' : 'Equipamento descartado.';
 
-  return `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
+  return `<div class="tag-card ${status==='atencao'?'alert':''}"><div class="inner">
       <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
       <div class="desc">${m.nome}</div>
       ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
@@ -1547,21 +1611,21 @@ function motorCard(m){
       ${qtdConsertos>0?`<div class="meta"><span>🔧 ${qtdConsertos} conserto${qtdConsertos>1?'s':''}</span><span>${formataMoeda(custoTotal)}</span></div>`:''}
       ${mtbf!==null?`<div class="meta"><span>MTBF</span><span>${mtbf} dia${mtbf!==1?'s':''}</span></div>`:''}
 
-      ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
+      ${status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
       <div class="row-2" style="margin-top:8px">
         <button class="btn btn-outline btn-sm motorEnviarConsertoBtn" data-id="${m.id}">Conserto</button>
         <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="descarte">Descarte</button>
       </div>
       <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
 
-      ${m.status==='conserto'?`<div class="note" style="color:var(--amber)">Aguardando retorno${consertoAberto&&consertoAberto.fornecedor?' — Fornecedor: '+consertoAberto.fornecedor:''}${consertoAberto&&consertoAberto.nf?' — NF: '+consertoAberto.nf:''}${consertoAberto&&consertoAberto.dataEnvio?' (enviado em '+new Date(consertoAberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR')+')':''}</div>
+      ${status==='conserto'?`<div class="note" style="color:var(--amber)">Aguardando retorno${consertoAberto&&consertoAberto.fornecedor?' — Fornecedor: '+consertoAberto.fornecedor:''}${consertoAberto&&consertoAberto.nf?' — NF: '+consertoAberto.nf:''}${consertoAberto&&consertoAberto.dataEnvio?' (enviado em '+new Date(consertoAberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR')+')':''}</div>
       <button class="btn btn-primary btn-sm motorRegistrarRetornoBtn" data-id="${m.id}" style="margin-top:8px">Registrar retorno</button>`:''}
 
-      ${m.status==='descarte'?`<div class="note" style="color:var(--brick)">Motor descartado.</div>
+      ${status==='descarte'?`<div class="note" style="color:var(--brick)">${descartadoLabel}</div>
       <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Reativar (voltar para reserva)</button>`:''}
 
       <div class="row-2" style="margin-top:8px">
-        ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
+        ${(status==='reserva'||status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
         <button class="btn btn-outline btn-sm motorHistoricoBtn" data-id="${m.id}">📋 Histórico</button>
       </div>
       <div class="row-2" style="margin-top:8px">
@@ -1585,7 +1649,7 @@ function consertoEnvioSheet(){
     <input id="consertoNF" placeholder="Ex: 12345">
     <label>Data de envio</label>
     <input id="consertoDataEnvio" type="date" value="${hoje}">
-    <div class="note">O motor fica em "Aguardando retorno" na aba Conserto / Descarte até você registrar o retorno com o valor gasto.</div>
+    <div class="note">Este RG fica em "Aguardando retorno" na aba Conserto / Descarte até você registrar o retorno com o valor gasto.</div>
     <button class="btn btn-primary" id="confirmConsertoEnvioBtn">Confirmar envio para conserto</button>
   </div></div>`;
 }
@@ -1664,9 +1728,9 @@ function motorMoveSheet(){
     <label>Para qual ativo (TAG) você quer movimentar este RG?</label>
     <select id="motorMoveDestino">
       <option value="">Selecione o ativo de destino...</option>
-      ${destinos.map(d=>`<option value="${d.id}" ${motorMoveDestino===d.id?'selected':''}>${d.codigo} — ${d.nome}${d.motorInstaladoId?' (já tem motor instalado)':''}</option>`).join('')}
+      ${destinos.map(d=>`<option value="${d.id}" ${motorMoveDestino===d.id?'selected':''}>${d.codigo} — ${d.nome}${d.motorInstaladoId?' (já tem item instalado)':''}</option>`).join('')}
     </select>
-    <div class="note" style="color:var(--amber)">Se o ativo escolhido já tiver outro motor instalado, os dois trocam de lugar: o motor atual dele vai para a Sala de Motores com status "Aguardando decisão".</div>
+    <div class="note" style="color:var(--amber)">Se o ativo escolhido já tiver outro item instalado, os dois trocam de lugar: o item atual dele vai para a Sala de Motores com status "Aguardando decisão".</div>
     <button class="btn btn-primary" id="confirmMotorMoveBtn">Confirmar movimentação</button>
   </div></div>`;
 }
@@ -1677,6 +1741,8 @@ function attachAtivosMaisEvents(){
 
   if(ativosMaisTab==='salamotores'){
     const tEquip = document.getElementById('tabEquipReserva'); if(tEquip) tEquip.onclick = ()=>{ salaMotoresTab='equipamentos'; salaMotoresBusca=''; renderView(); };
+    const tEquipInst = document.getElementById('tabEquipInstalados'); if(tEquipInst) tEquipInst.onclick = ()=>{ salaMotoresTab='equipInstalados'; salaMotoresBusca=''; renderView(); };
+    const tEquipCons = document.getElementById('tabEquipConserto'); if(tEquipCons) tEquipCons.onclick = ()=>{ salaMotoresTab='equipConserto'; salaMotoresBusca=''; renderView(); };
     const tMotRes = document.getElementById('tabMotoresReserva'); if(tMotRes) tMotRes.onclick = ()=>{ salaMotoresTab='motoresReserva'; salaMotoresBusca=''; renderView(); };
     const tMotInst = document.getElementById('tabMotoresInstalados'); if(tMotInst) tMotInst.onclick = ()=>{ salaMotoresTab='motoresInstalados'; salaMotoresBusca=''; renderView(); };
     const tMotCons = document.getElementById('tabMotoresConserto'); if(tMotCons) tMotCons.onclick = ()=>{ salaMotoresTab='motoresConserto'; salaMotoresBusca=''; renderView(); };
@@ -1688,17 +1754,25 @@ function attachAtivosMaisEvents(){
     if(newBtn) newBtn.onclick = ()=>{ editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
 
     document.querySelectorAll('.editMotorBtn').forEach(b=>{
-      b.onclick = ()=>{ editingMotor = DB.ativosRG.find(r=>r.id===b.dataset.id); motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
+      b.onclick = ()=>{
+        const rg = DB.ativosRG.find(r=>r.id===b.dataset.id);
+        if(rg && rg.tipo==='Motor'){
+          editingMotor = rg; motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true;
+        } else {
+          editingEquip = rg; equipFormDraft=null; showEquipForm=true;
+        }
+        renderView();
+      };
     });
 
     document.querySelectorAll('.deleteMotorBtn').forEach(b=>{
       b.onclick = async ()=>{
         const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
         if(motor && motor.status==='instalado'){ toast('Este RG está instalado em um TAG. Movimente o motor antes de excluir.'); return; }
-        if(!confirm('Excluir este motor definitivamente? O número de RG não será reutilizado.')) return;
+        if(!confirm('Excluir este item definitivamente? O número de RG não será reutilizado.')) return;
         DB.ativosRG = DB.ativosRG.filter(r=>r.id!==b.dataset.id);
         await saveAll(KEYS.ativosRG, DB.ativosRG);
-        toast('Motor excluído'); renderView();
+        toast('Excluído'); renderView();
       };
     });
 
@@ -1858,21 +1932,35 @@ function attachAtivosMaisEvents(){
       const localizacao = document.getElementById('rgLocalizacao').value.trim();
       if(!nome){ toast('Preencha o nome'); return; }
       const numeroRG = proximoNumeroRGEquipamento();
-      DB.ativosRG.push({id:uid(), tipo, descricaoOutros, nome, numeroRG, localizacao:localizacao||'Sala de Motores', fabricante:'', modelo:'', numeroSerie:'', dataCadastro:new Date().toISOString()});
+      DB.ativosRG.push({id:uid(), tipo, descricaoOutros, nome, numeroRG, localizacao:localizacao||'Sala de Motores', fabricante:'', modelo:'', numeroSerie:'', status:'reserva', ativoId:null, historico:[], consertos:[], dataCadastro:new Date().toISOString()});
       await saveAll(KEYS.ativosRG, DB.ativosRG);
       toast('Adicionado à Sala de Motores com RG '+numeroRG); renderView();
     };
 
-    document.querySelectorAll('.deleteRGBtn').forEach(b=>{
-      b.onclick = async ()=>{
-        const rg = DB.ativosRG.find(r=>r.id===b.dataset.id);
-        if(rg && rg.status==='instalado'){ toast('Este RG está instalado em um TAG. Movimente o motor antes de excluir.'); return; }
-        if(!confirm('Excluir este equipamento reserva definitivamente?')) return;
-        DB.ativosRG = DB.ativosRG.filter(rg=>rg.id!==b.dataset.id);
-        await saveAll(KEYS.ativosRG, DB.ativosRG);
-        toast('Excluído'); renderView();
-      };
-    });
+    const closeEquipBtn = document.getElementById('closeEquipForm');
+    if(closeEquipBtn) closeEquipBtn.onclick = ()=>{ showEquipForm=false; editingEquip=null; equipFormDraft=null; renderView(); };
+
+    const equipTipoSel = document.getElementById('eTipo');
+    const equipOutrosWrap = document.getElementById('eOutrosWrap');
+    if(equipTipoSel) equipTipoSel.onchange = ()=>{ if(equipOutrosWrap) equipOutrosWrap.classList.toggle('hidden', equipTipoSel.value!=='Outros'); };
+
+    const saveEquipBtn = document.getElementById('saveEquipBtn');
+    if(saveEquipBtn) saveEquipBtn.onclick = async ()=>{
+      if(!editingEquip) return;
+      const nome = (document.getElementById('eNome')||{}).value?.trim() || '';
+      if(!nome){ toast('Preencha o nome'); return; }
+      editingEquip.tipo = (document.getElementById('eTipo')||{}).value || editingEquip.tipo;
+      editingEquip.descricaoOutros = editingEquip.tipo==='Outros' ? ((document.getElementById('eOutrosDescricao')||{}).value?.trim()||'') : '';
+      editingEquip.nome = nome;
+      editingEquip.fabricante = (document.getElementById('eFabricante')||{}).value?.trim() || '';
+      editingEquip.modelo = (document.getElementById('eModelo')||{}).value?.trim() || '';
+      editingEquip.numeroSerie = (document.getElementById('eNumeroSerie')||{}).value?.trim() || '';
+      editingEquip.localizacao = (document.getElementById('eLocalizacao')||{}).value?.trim() || '';
+      editingEquip.observacoes = (document.getElementById('eObservacoes')||{}).value?.trim() || '';
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      showEquipForm=false; editingEquip=null; equipFormDraft=null;
+      toast('Equipamento salvo'); renderView();
+    };
 
     const exportRGBtn = document.getElementById('exportRGBtn');
     if(exportRGBtn) exportRGBtn.onclick = exportSalaMotoresXlsx;
