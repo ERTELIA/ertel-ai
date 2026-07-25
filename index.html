@@ -845,6 +845,24 @@ function proximoNumeroRGMotor(){
   return 'M' + String(max+1).padStart(4,'0');
 }
 
+// RG automático para equipamentos reserva (motoredutor/redutor/bomba/outros): E0001..E9999,
+// e ao esgotar 9999 volta pra E0001-01, E0002-01... (novo ciclo com sufixo -01, -02...).
+function proximoNumeroRGEquipamento(){
+  let maxCiclo = 0, maxSeqNoCiclo = 0;
+  DB.ativosRG.forEach(rg=>{
+    if(rg.tipo==='Motor') return;
+    const m = /^E(\d{4})(?:-(\d{2}))?$/i.exec(rg.numeroRG||'');
+    if(!m) return;
+    const seq = parseInt(m[1],10);
+    const ciclo = m[2] ? parseInt(m[2],10) : 0;
+    if(ciclo>maxCiclo || (ciclo===maxCiclo && seq>maxSeqNoCiclo)){ maxCiclo=ciclo; maxSeqNoCiclo=seq; }
+  });
+  let seq = maxSeqNoCiclo + 1, ciclo = maxCiclo;
+  if(seq>9999){ seq=1; ciclo=maxCiclo+1; }
+  const seqStr = String(seq).padStart(4,'0');
+  return ciclo===0 ? ('E'+seqStr) : ('E'+seqStr+'-'+String(ciclo).padStart(2,'0'));
+}
+
 /* ---- Métricas de manutenção do motor (consertos, custo, MTBF) ---- */
 function motorQtdConsertos(m){ return (m.consertos||[]).length; }
 
@@ -1477,7 +1495,7 @@ function salaMotoresSection(){
   }
 
   // salaMotoresTab === 'equipamentos'
-  html += `<div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros — cadastrados manualmente com RG próprio.</div>`;
+  html += `<div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros. Cada um recebe um RG sequencial automático (E0001, E0002...). Ao chegar em E9999, o próximo passa a ser E0001-01, E0002-01... — você não escolhe o número.</div>`;
   html += `<div class="card">
     <label>Tipo de equipamento</label>
     <select id="rgTipo">${TIPOS_RG.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
@@ -1487,8 +1505,7 @@ function salaMotoresSection(){
     </div>
     <label>Nome / Descrição</label>
     <input id="rgNome" placeholder="Ex: Redutor reserva">
-    <label>Número de RG</label>
-    <input id="rgNumero" placeholder="Ex: RG-0032">
+    <div class="note">O RG será gerado automaticamente ao salvar: <b>${proximoNumeroRGEquipamento()}</b></div>
     <label>Localização</label>
     <input id="rgLocalizacao" placeholder="Ex: Sala de Motores - Prateleira 2" value="Sala de Motores">
     <button class="btn btn-primary btn-sm" id="addRGBtn">Adicionar à Sala de Motores</button>
@@ -1838,13 +1855,12 @@ function attachAtivosMaisEvents(){
       const tipo = document.getElementById('rgTipo').value;
       const descricaoOutros = document.getElementById('rgOutrosDescricao') ? document.getElementById('rgOutrosDescricao').value.trim() : '';
       const nome = document.getElementById('rgNome').value.trim();
-      const numeroRG = document.getElementById('rgNumero').value.trim();
       const localizacao = document.getElementById('rgLocalizacao').value.trim();
-      if(!nome || !numeroRG){ toast('Preencha nome e número de RG'); return; }
-      if(DB.ativosRG.some(rg=>rg.numeroRG.toLowerCase()===numeroRG.toLowerCase())){ toast('Já existe um RG com esse número'); return; }
+      if(!nome){ toast('Preencha o nome'); return; }
+      const numeroRG = proximoNumeroRGEquipamento();
       DB.ativosRG.push({id:uid(), tipo, descricaoOutros, nome, numeroRG, localizacao:localizacao||'Sala de Motores', fabricante:'', modelo:'', numeroSerie:'', dataCadastro:new Date().toISOString()});
       await saveAll(KEYS.ativosRG, DB.ativosRG);
-      toast('Adicionado à Sala de Motores'); renderView();
+      toast('Adicionado à Sala de Motores com RG '+numeroRG); renderView();
     };
 
     document.querySelectorAll('.deleteRGBtn').forEach(b=>{
