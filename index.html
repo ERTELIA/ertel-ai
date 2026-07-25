@@ -1128,6 +1128,25 @@ function movimentarRGParaAtivo(motorId, destinoAtivo){
   destinoAtivo.campos = {...(novo.campos||{})};
 }
 
+// Desfaz o vínculo de um RG instalado, devolvendo-o para a Sala de Motores (reserva)
+// e liberando o TAG (que volta a ser um slot vazio, sem tipo/dados técnicos).
+function desvincularMotorDoTag(motorId){
+  const motor = DB.ativosRG.find(r=>r.id===motorId);
+  if(!motor || !motor.ativoId) return;
+  const tag = DB.ativos.find(a=>a.id===motor.ativoId);
+  if(tag && tag.motorInstaladoId===motor.id){
+    tag.motorInstaladoId = null;
+    tag.tipo = '';
+    tag.fabricante = ''; tag.modelo = ''; tag.numeroSerie = ''; tag.placaIdentificacao = ''; tag.campos = {};
+  }
+  motor.status = 'reserva';
+  motor.ativoId = null;
+  if(motor.historico && motor.historico.length>0){
+    const ultimo = motor.historico[motor.historico.length-1];
+    if(!ultimo.dataSaida) ultimo.dataSaida = new Date().toISOString();
+  }
+}
+
 function quickFillButtons(fieldId, opcoes){
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
     ${opcoes.map(o=>`<button type="button" class="btn btn-ghost quickFillBtn" data-field="${fieldId}" data-value="${o}" style="width:auto;margin:0;padding:5px 9px;font-size:11px">${o}</button>`).join('')}
@@ -1735,6 +1754,8 @@ function motorCard(m){
       ${status==='descarte'?`<div class="note" style="color:var(--brick)">${descartadoLabel}</div>
       <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Reativar (voltar para reserva)</button>`:''}
 
+      ${status==='instalado'?`<button class="btn btn-outline btn-sm motorDesvincularBtn" data-id="${m.id}" style="margin-top:8px;border-color:var(--brick);color:var(--brick)">↩️ Desvincular do TAG</button>`:''}
+
       <div class="row-2" style="margin-top:8px">
         ${(status==='reserva'||status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
         <button class="btn btn-outline btn-sm motorHistoricoBtn" data-id="${m.id}">📋 Histórico</button>
@@ -2018,6 +2039,18 @@ function attachAtivosMaisEvents(){
 
     document.querySelectorAll('.motorMoveBtn').forEach(b=>{
       b.onclick = ()=>{ motorMoveId=b.dataset.id; motorMoveDestino=''; renderView(); };
+    });
+
+    document.querySelectorAll('.motorDesvincularBtn').forEach(b=>{
+      b.onclick = async ()=>{
+        const motor = DB.ativosRG.find(r=>r.id===b.dataset.id);
+        const tag = motor && motor.ativoId ? DB.ativos.find(a=>a.id===motor.ativoId) : null;
+        if(!confirm(`Desvincular ${motor?motor.numeroRG:'este RG'} de ${tag?tag.codigo+' — '+tag.nome:'seu TAG atual'}? Ele volta para a Sala de Motores e o TAG fica vazio (sem tipo/dados técnicos).`)) return;
+        desvincularMotorDoTag(b.dataset.id);
+        await saveAll(KEYS.ativos, DB.ativos);
+        await saveAll(KEYS.ativosRG, DB.ativosRG);
+        toast('Desvinculado — RG voltou para a Sala de Motores'); renderView();
+      };
     });
 
     const closeMoveBtn = document.getElementById('closeMotorMove');
