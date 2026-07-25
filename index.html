@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>ERTEL — Controle de Estoque</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSIjMEMxMjFDIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSJub25lIiBzdHJva2U9IiMzRThFRTAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM2IiBmaWxsPSIjRThBMzNEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pgo8L3N2Zz4=">
-<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSIjMEMxMjFDIi8+CjxjaXJjbGUgY3g9IjMyIiBjeT0iMzIiIHI9IjMxIiBmaWxsPSJub25lIiBzdHJva2U9IiMzRThFRTAiIHN0cm9rZS13aWR0aD0iMiIvPgo8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjM2IiBmaWxsPSIjRThBMzNEIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5FPC90ZXh0Pgo8L3N2Zz4=">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0iIzBDMTIxQyIgc3Ryb2tlPSIjM0U4RUUwIiBzdHJva2Utd2lkdGg9IjIuNSIvPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnZWFyTWV0YWwiIHgxPSIyMCIgeTE9IjEwIiB4Mj0iODAiIHkyPSI5MCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM5YWE2YjUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIwLjUiIHN0b3AtY29sb3I9IiM0YTU3NjgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMWMyMzJkIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJpbm5lckRpc2MiIGN4PSIzNSUiIGN5PSIyOCUiIHI9IjgwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJlM2M0YyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZTEzMWEiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImFtYmVyRSIgeDE9IjUwIiB5MT0iMzQiIHgyPSI1MCIgeTI9IjY4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0Y3QzA3NyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNEOTc5MUUiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgwIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDM2IDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDcyIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDEwOCA1MCA1MCkiLz4KICAgIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgxNDQgNTAgNTApIi8+CiAgICA8cmVjdCB4PSI0NiIgeT0iMiIgd2lkdGg9IjgiIGhlaWdodD0iMTciIHJ4PSIyLjIiIGZpbGw9InVybCgjZ2Vhck1ldGFsKSIgdHJhbnNmb3JtPSJyb3RhdGUoMTgwIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDIxNiA1MCA1MCkiLz4KICAgIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgyNTIgNTAgNTApIi8+CiAgICA8cmVjdCB4PSI0NiIgeT0iMiIgd2lkdGg9IjgiIGhlaWdodD0iMTciIHJ4PSIyLjIiIGZpbGw9InVybCgjZ2Vhck1ldGFsKSIgdHJhbnNmb3JtPSJyb3RhdGUoMjg4IDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDMyNCA1MCA1MCkiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMyIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIi8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjUuNSIgZmlsbD0idXJsKCNpbm5lckRpc2MpIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsLjE2KSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8ZWxsaXBzZSBjeD0iMzciIGN5PSIyOCIgcng9IjE1IiByeT0iNiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwuMTApIiB0cmFuc2Zvcm09InJvdGF0ZSgtMjggMzcgMjgpIi8+CiAgPHRleHQgeD0iNTAiIHk9IjYxLjUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjI5IiBmaWxsPSJ1cmwoI2FtYmVyRSkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkU8L3RleHQ+Cjwvc3ZnPg==">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0OCIgZmlsbD0iIzBDMTIxQyIgc3Ryb2tlPSIjM0U4RUUwIiBzdHJva2Utd2lkdGg9IjIuNSIvPgogIDxkZWZzPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJnZWFyTWV0YWwiIHgxPSIyMCIgeTE9IjEwIiB4Mj0iODAiIHkyPSI5MCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiM5YWE2YjUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIwLjUiIHN0b3AtY29sb3I9IiM0YTU3NjgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMWMyMzJkIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJpbm5lckRpc2MiIGN4PSIzNSUiIGN5PSIyOCUiIHI9IjgwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzJlM2M0YyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwZTEzMWEiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImFtYmVyRSIgeDE9IjUwIiB5MT0iMzQiIHgyPSI1MCIgeTI9IjY4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI0Y3QzA3NyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNEOTc5MUUiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgwIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDM2IDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDcyIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDEwOCA1MCA1MCkiLz4KICAgIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgxNDQgNTAgNTApIi8+CiAgICA8cmVjdCB4PSI0NiIgeT0iMiIgd2lkdGg9IjgiIGhlaWdodD0iMTciIHJ4PSIyLjIiIGZpbGw9InVybCgjZ2Vhck1ldGFsKSIgdHJhbnNmb3JtPSJyb3RhdGUoMTgwIDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDIxNiA1MCA1MCkiLz4KICAgIDxyZWN0IHg9IjQ2IiB5PSIyIiB3aWR0aD0iOCIgaGVpZ2h0PSIxNyIgcng9IjIuMiIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIiB0cmFuc2Zvcm09InJvdGF0ZSgyNTIgNTAgNTApIi8+CiAgICA8cmVjdCB4PSI0NiIgeT0iMiIgd2lkdGg9IjgiIGhlaWdodD0iMTciIHJ4PSIyLjIiIGZpbGw9InVybCgjZ2Vhck1ldGFsKSIgdHJhbnNmb3JtPSJyb3RhdGUoMjg4IDUwIDUwKSIvPgogICAgPHJlY3QgeD0iNDYiIHk9IjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjE3IiByeD0iMi4yIiBmaWxsPSJ1cmwoI2dlYXJNZXRhbCkiIHRyYW5zZm9ybT0icm90YXRlKDMyNCA1MCA1MCkiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzMyIgZmlsbD0idXJsKCNnZWFyTWV0YWwpIi8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI1MCIgcj0iMjUuNSIgZmlsbD0idXJsKCNpbm5lckRpc2MpIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsLjE2KSIgc3Ryb2tlLXdpZHRoPSIxLjMiLz4KICA8ZWxsaXBzZSBjeD0iMzciIGN5PSIyOCIgcng9IjE1IiByeT0iNiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwuMTApIiB0cmFuc2Zvcm09InJvdGF0ZSgtMjggMzcgMjgpIi8+CiAgPHRleHQgeD0iNTAiIHk9IjYxLjUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgSGVsdmV0aWNhLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmb250LXNpemU9IjI5IiBmaWxsPSJ1cmwoI2FtYmVyRSkiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkU8L3RleHQ+Cjwvc3ZnPg==">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';document.head.appendChild(s);"></script>
@@ -131,15 +131,10 @@
     -webkit-mask-image:radial-gradient(ellipse at 65% 25%, black, transparent 72%);
   }
   .login-content{position:relative;z-index:1;width:100%;max-width:420px;margin:0 auto;}
-  .login-logo-row{display:flex;align-items:center;gap:14px;margin-bottom:2px;}
-  .gear-badge{width:58px;height:58px;border-radius:50%;flex-shrink:0;
-    background:repeating-conic-gradient(#4a5a6d 0deg 13deg, transparent 13deg 26deg);
-    display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 3px 8px rgba(0,0,0,.5));}
-  .gear-badge .inner-circle{width:74%;height:74%;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#2b3846,#10151c);
-    border:2px solid rgba(255,255,255,.09);display:flex;align-items:center;justify-content:center;}
-  .gear-badge .letter{font-family:var(--font-display);font-weight:700;font-size:24px;
-    background:linear-gradient(180deg,#F5B15A,#D9791E);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .login-decor{position:absolute;top:-40px;right:-60px;width:340px;height:340px;z-index:0;pointer-events:none;opacity:.55;}
+  .login-logo-row{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:4px;}
+  .gear-badge{width:84px;height:84px;flex-shrink:0;filter:drop-shadow(0 6px 16px rgba(0,0,0,.55)) drop-shadow(0 0 22px rgba(62,142,224,.25));}
+  .gear-badge svg{width:100%;height:100%;display:block;}
   .login-brand2 .word{font-family:var(--font-display);font-size:38px;font-weight:700;letter-spacing:3px;line-height:1;
     background:linear-gradient(180deg,#F2F4F7,#AEB8C4);-webkit-background-clip:text;background-clip:text;color:transparent;}
   .login-brand2 .sub{font-family:var(--font-body);font-weight:700;font-size:11.5px;letter-spacing:2.2px;color:var(--amber);margin-top:3px;}
@@ -199,6 +194,7 @@
     .view{max-width:820px;margin:0 auto;padding:20px 24px;}
     .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start;}
     .card-grid > .tag-card, .card-grid > .card{margin-bottom:0;}
+    .tag-card{max-width:420px;}
     .overlay{align-items:center;padding:20px;}
     .sheet{max-width:560px;border-radius:16px;max-height:85vh;}
   }
@@ -383,6 +379,72 @@ function toast(msg){
   setTimeout(()=>t.remove(), 2400);
 }
 
+const LOGO_MARK = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gearMetal" x1="20" y1="10" x2="80" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9aa6b5"/>
+      <stop offset="0.5" stop-color="#4a5768"/>
+      <stop offset="1" stop-color="#1c232d"/>
+    </linearGradient>
+    <radialGradient id="innerDisc" cx="35%" cy="28%" r="80%">
+      <stop offset="0" stop-color="#2e3c4c"/>
+      <stop offset="1" stop-color="#0e131a"/>
+    </radialGradient>
+    <linearGradient id="amberE" x1="50" y1="34" x2="50" y2="68" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7C077"/>
+      <stop offset="1" stop-color="#D9791E"/>
+    </linearGradient>
+  </defs>
+  <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(0 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(36 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(72 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(108 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(144 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(180 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(216 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(252 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(288 50 50)"/>
+    <rect x="46" y="2" width="8" height="17" rx="2.2" fill="url(#gearMetal)" transform="rotate(324 50 50)"/>
+  <circle cx="50" cy="50" r="33" fill="url(#gearMetal)"/>
+  <circle cx="50" cy="50" r="25.5" fill="url(#innerDisc)" stroke="rgba(255,255,255,.16)" stroke-width="1.3"/>
+  <ellipse cx="37" cy="28" rx="15" ry="6" fill="rgba(255,255,255,.10)" transform="rotate(-28 37 28)"/>
+  <text x="50" y="61.5" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="29" fill="url(#amberE)" text-anchor="middle">E</text>
+</svg>`;
+const LOGIN_DECOR = `<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="170" cy="140" r="118" fill="none" stroke="#3E8EE0" stroke-opacity=".18" stroke-width="1.5"/>
+  <circle cx="170" cy="140" r="92" fill="none" stroke="#3E8EE0" stroke-opacity=".28" stroke-width="1.3" stroke-dasharray="3 7"/>
+  <circle cx="170" cy="140" r="66" fill="#3E8EE0" fill-opacity=".07" stroke="#3E8EE0" stroke-opacity=".5" stroke-width="1.5"/>
+  <g stroke="#3E8EE0" stroke-opacity=".85" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M170 116l28 16v32l-28 16-28-16v-32z"/>
+    <path d="M170 116l28 16-28 16-28-16z"/>
+    <path d="M170 148v32"/>
+  </g>
+  <line x1="238" y1="98" x2="264" y2="72" stroke="#3E8EE0" stroke-opacity=".35" stroke-width="1.3"/>
+  <line x1="240" y1="150" x2="278" y2="150" stroke="#3E8EE0" stroke-opacity=".35" stroke-width="1.3"/>
+  <line x1="222" y1="206" x2="248" y2="232" stroke="#3E8EE0" stroke-opacity=".35" stroke-width="1.3"/>
+  <line x1="118" y1="80" x2="100" y2="46" stroke="#3E8EE0" stroke-opacity=".35" stroke-width="1.3"/>
+
+  <circle cx="266" cy="64" r="21" fill="#0E1626" stroke="#3E8EE0" stroke-opacity=".55" stroke-width="1.4"/>
+  <g transform="translate(266 64)" stroke="#7FB4EE" stroke-width="2" fill="none" stroke-linecap="round">
+    <line x1="-8" y1="-6" x2="-8" y2="6"/><line x1="-4" y1="-6" x2="-4" y2="6"/>
+    <line x1="1" y1="-6" x2="1" y2="6"/><line x1="6" y1="-6" x2="6" y2="6"/>
+  </g>
+
+  <circle cx="288" cy="150" r="21" fill="#0E1626" stroke="#3E8EE0" stroke-opacity=".55" stroke-width="1.4"/>
+  <g transform="translate(288 150)" stroke="#7FB4EE" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-6 4l5-5 3 3 6-6"/><path d="M2 -4h6v6"/>
+  </g>
+
+  <circle cx="256" cy="240" r="21" fill="#0E1626" stroke="#E8A33D" stroke-opacity=".55" stroke-width="1.4"/>
+  <g transform="translate(256 240)" stroke="#F0B44E" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-3 -7a4 4 0 100 8 4 4 0 000-8z"/><path d="M-3 -9v2M-3 4v2M-9 -3h2M2 -3h2M-7.2 -7.2l1.4 1.4M-1.2 -7.2l-1.4 1.4M-7.2 1.2l1.4 -1.4M-1.2 1.2l-1.4 -1.4"/>
+  </g>
+
+  <circle cx="92" cy="38" r="19" fill="#0E1626" stroke="#3E8EE0" stroke-opacity=".55" stroke-width="1.4"/>
+  <g transform="translate(92 38)" stroke="#7FB4EE" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-6 -5h12v10h-12z"/><path d="M-6 -1h12"/>
+  </g>
+</svg>`;
 /* ============ ICONS (inline svg, stroke=currentColor) ============ */
 const ICONS = {
   home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
@@ -470,9 +532,9 @@ function moduloSelectorScreen(){
   const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   return `
-  <div class="login-wrap"><div class="login-content">
+  <div class="login-wrap"><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
-      <div class="gear-badge"><div class="inner-circle"><span class="letter">E</span></div></div>
+      <div class="gear-badge">${LOGO_MARK}</div>
       <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">SELECIONE O ACESSO</div></div>
     </div>
     <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
@@ -507,6 +569,7 @@ function resetModuleUiState(){
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
   showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
+  salaMotoresTab='motoresReserva'; salaMotoresBusca='';
 }
 
 function attachModuloSelectorEvents(){
@@ -866,7 +929,14 @@ function ativosListView(){
 
   if(list.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum ativo encontrado.</div>`; }
   const raizes = (visualizacaoArvoreAtivos && !buscaAtiva) ? list.filter(a=>!a.ativoPaiId || !list.some(x=>x.id===a.ativoPaiId)) : list;
-  raizes.forEach(a=>{ html += cardAtivo(a, 0); });
+  const modoArvore = visualizacaoArvoreAtivos && !buscaAtiva;
+  if(modoArvore){
+    raizes.forEach(a=>{ html += cardAtivo(a, 0); });
+  } else {
+    html += `<div class="card-grid">`;
+    raizes.forEach(a=>{ html += cardAtivo(a, 0); });
+    html += `</div>`;
+  }
 
   if(showAtivoForm && isAdmin) html += ativoFormSheet();
   if(pecasAtivoId && isAdmin) html += pecasSheet();
@@ -877,8 +947,15 @@ function ativosListView(){
 function movimentarRGParaAtivo(motorId, destinoAtivo){
   const novo = DB.ativosRG.find(r=>r.id===motorId);
   if(!novo || !destinoAtivo) return;
+
+  // Se este motor já estava instalado em outro TAG, libera o TAG antigo dele.
+  if(novo.ativoId && novo.ativoId!==destinoAtivo.id){
+    const tagAntigo = DB.ativos.find(a=>a.id===novo.ativoId);
+    if(tagAntigo && tagAntigo.motorInstaladoId===novo.id) tagAntigo.motorInstaladoId = null;
+  }
+
   const antigoMotorId = destinoAtivo.motorInstaladoId;
-  if(antigoMotorId){
+  if(antigoMotorId && antigoMotorId!==novo.id){
     const antigo = DB.ativosRG.find(r=>r.id===antigoMotorId);
     if(antigo){
       antigo.status = 'atencao';
@@ -1278,6 +1355,8 @@ const FORMATO_COLUNAS_ATIVOS = ['Código','Nome','Tipo','Fabricante','Modelo','N
 let exportAtivosBusy = false;
 
 let ativosMaisTab = 'importar';
+let salaMotoresTab = 'motoresReserva';
+let salaMotoresBusca = '';
 
 function ativosMaisView(){
   let html = `<div class="tabs-wrap">
@@ -1311,43 +1390,46 @@ function ativosMaisView(){
 function salaMotoresSection(){
   const motores = DB.ativosRG.filter(rg=>rg.tipo==='Motor');
   const outrosRG = DB.ativosRG.filter(rg=>rg.tipo!=='Motor');
+  const motoresReserva = motores.filter(m=>m.status!=='instalado');
+  const motoresInstalados = motores.filter(m=>m.status==='instalado');
 
-  let html = `<h2 class="section-title" style="font-size:16px">Motores</h2>
-  <div class="note" style="margin-bottom:10px">Cada motor cadastrado aqui recebe um RG sequencial automático (M0001, M0002...). Você não escolhe o número.</div>
-  <button class="btn btn-primary" id="newMotorBtn">+ Novo motor</button>`;
+  const busca = salaMotoresBusca.trim().toLowerCase();
+  const bate = rg => !busca || [rg.nome, rg.modelo, rg.fabricante, rg.numeroRG].some(v=>(v||'').toLowerCase().includes(busca));
 
-  if(showMotorForm) html += motorFormSheet();
+  let html = `<div class="tabs-wrap">
+    <button class="btn ${salaMotoresTab==='equipamentos'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipReserva">Equipamentos reserva (${outrosRG.length})</button>
+    <button class="btn ${salaMotoresTab==='motoresReserva'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresReserva">Motores reserva (${motoresReserva.length})</button>
+    <button class="btn ${salaMotoresTab==='motoresInstalados'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresInstalados">Motores instalados (${motoresInstalados.length})</button>
+  </div>`;
 
-  if(motores.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum motor cadastrado ainda.</div>`; }
-  motores.slice().reverse().forEach(m=>{
-    const statusLabel = STATUS_MOTOR[m.status] || m.status;
-    const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
-    const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
-    html += `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
-      <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
-      <div class="desc">${m.nome}</div>
-      ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
-      ${instaladoEm?`<div class="meta"><span>📍 Instalado em: ${instaladoEm.codigo} — ${instaladoEm.nome}</span><span></span></div>`:`<div class="meta"><span>📍 ${m.localizacao||'Sala de Motores'}</span><span></span></div>`}
-      <div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>
-      ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
-      <div class="row-2" style="margin-top:8px">
-        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="conserto">Conserto</button>
-        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="descarte">Descarte</button>
-      </div>
-      <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
-      ${(m.status==='conserto'||m.status==='descarte')?`<button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Voltar para reserva</button>`:''}
-      <div class="row-2" style="margin-top:8px">
-        ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
-        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
-      </div>
-      <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}" style="margin-top:8px">Excluir</button>
-    </div></div>`;
-  });
+  html += `<div class="search"><input id="salaMotoresBuscaInput" placeholder="Buscar por nome, modelo, fabricante ou RG" value="${salaMotoresBusca}"></div>`;
 
-  if(motorMoveId) html += motorMoveSheet();
+  if(salaMotoresTab==='motoresReserva'){
+    html += `<div class="note" style="margin-bottom:10px">Cada motor cadastrado aqui recebe um RG sequencial automático (M0001, M0002...). Você não escolhe o número.</div>
+    <button class="btn btn-primary" id="newMotorBtn">+ Novo motor</button>`;
+    if(showMotorForm) html += motorFormSheet();
 
-  html += `<h2 class="section-title" style="font-size:16px;margin-top:22px">Outros equipamentos reserva</h2>
-  <div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros — cadastrados manualmente com RG próprio.</div>`;
+    const lista = motoresReserva.filter(bate);
+    if(lista.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum motor em reserva encontrado.</div>`; }
+    html += `<div class="card-grid">`;
+    lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
+    html += `</div>`;
+    if(motorMoveId) html += motorMoveSheet();
+    return html;
+  }
+
+  if(salaMotoresTab==='motoresInstalados'){
+    const lista = motoresInstalados.filter(bate);
+    if(lista.length===0){ html += `<div class="empty"><div class="icon">⚙️</div>Nenhum motor instalado encontrado.</div>`; }
+    html += `<div class="card-grid">`;
+    lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
+    html += `</div>`;
+    if(motorMoveId) html += motorMoveSheet();
+    return html;
+  }
+
+  // salaMotoresTab === 'equipamentos'
+  html += `<div class="note" style="margin-bottom:10px">Motoredutores, redutores, bombas e outros — cadastrados manualmente com RG próprio.</div>`;
   html += `<div class="card">
     <label>Tipo de equipamento</label>
     <select id="rgTipo">${TIPOS_RG.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
@@ -1366,8 +1448,10 @@ function salaMotoresSection(){
 
   html += `<div class="row-2"><button class="btn btn-outline btn-sm" id="exportRGBtn">Exportar lista (Excel)</button></div>`;
 
-  if(outrosRG.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum outro equipamento reserva cadastrado.</div>`; }
-  outrosRG.slice().reverse().forEach(rg=>{
+  const listaOutros = outrosRG.filter(bate);
+  if(listaOutros.length===0){ html += `<div class="empty"><div class="icon">🏠</div>Nenhum equipamento reserva encontrado.</div>`; }
+  html += `<div class="card-grid">`;
+  listaOutros.slice().reverse().forEach(rg=>{
     html += `<div class="tag-card"><div class="inner">
       <div class="row1"><span class="codigo">${rg.numeroRG}</span><span class="qtd" style="font-size:12px">${rg.tipo==='Outros'?(rg.descricaoOutros||'Outros'):rg.tipo}</span></div>
       <div class="desc">${rg.nome}</div>
@@ -1376,7 +1460,33 @@ function salaMotoresSection(){
       <button class="btn btn-danger btn-sm deleteRGBtn" data-id="${rg.id}" style="margin-top:8px">Excluir</button>
     </div></div>`;
   });
+  html += `</div>`;
   return html;
+}
+
+function motorCard(m){
+  const statusLabel = STATUS_MOTOR[m.status] || m.status;
+  const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
+  const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
+  return `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
+      <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
+      <div class="desc">${m.nome}</div>
+      ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
+      ${instaladoEm?`<div class="meta"><span>📍 Instalado em: ${instaladoEm.codigo} — ${instaladoEm.nome}</span><span></span></div>`:`<div class="meta"><span>📍 ${m.localizacao||'Sala de Motores'}</span><span></span></div>`}
+      <div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>
+      ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
+      <div class="row-2" style="margin-top:8px">
+        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="conserto">Conserto</button>
+        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="descarte">Descarte</button>
+      </div>
+      <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
+      ${(m.status==='conserto'||m.status==='descarte')?`<button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Voltar para reserva</button>`:''}
+      <div class="row-2" style="margin-top:8px">
+        ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
+        <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
+      </div>
+      <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}" style="margin-top:8px">Excluir</button>
+    </div></div>`;
 }
 
 /* ---- Movimentar RG de motor para um ativo (TAG) já cadastrado ---- */
@@ -1404,6 +1514,13 @@ function attachAtivosMaisEvents(){
   const tSala = document.getElementById('tabSalaMotores'); if(tSala) tSala.onclick = ()=>{ ativosMaisTab='salamotores'; renderView(); };
 
   if(ativosMaisTab==='salamotores'){
+    const tEquip = document.getElementById('tabEquipReserva'); if(tEquip) tEquip.onclick = ()=>{ salaMotoresTab='equipamentos'; salaMotoresBusca=''; renderView(); };
+    const tMotRes = document.getElementById('tabMotoresReserva'); if(tMotRes) tMotRes.onclick = ()=>{ salaMotoresTab='motoresReserva'; salaMotoresBusca=''; renderView(); };
+    const tMotInst = document.getElementById('tabMotoresInstalados'); if(tMotInst) tMotInst.onclick = ()=>{ salaMotoresTab='motoresInstalados'; salaMotoresBusca=''; renderView(); };
+
+    const buscaInput = document.getElementById('salaMotoresBuscaInput');
+    if(buscaInput) buscaInput.oninput = ()=>{ salaMotoresBusca = buscaInput.value; renderView(); const el=document.getElementById('salaMotoresBuscaInput'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
+
     const newBtn = document.getElementById('newMotorBtn');
     if(newBtn) newBtn.onclick = ()=>{ editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; showMotorForm=true; renderView(); };
 
@@ -1793,9 +1910,9 @@ let loginScanning = false;
 
 function loginScreen(){
   return `
-  <div class="login-wrap"><div class="login-content">
+  <div class="login-wrap"><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
-      <div class="gear-badge"><div class="inner-circle"><span class="letter">E</span></div></div>
+      <div class="gear-badge">${LOGO_MARK}</div>
       <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">CONTROLE DE ESTOQUE</div></div>
     </div>
     <div class="login-tagline">Inteligência e precisão para o controle do seu estoque.</div>
