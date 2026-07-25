@@ -569,6 +569,7 @@ function resetModuleUiState(){
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
   pecasAtivoId=null; editingPeca=null; showPecaForm=false;
   showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; motorMoveId=null; motorMoveDestino='';
+  motorConsertoEnvioId=null; motorConsertoRetornoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
 }
 
@@ -829,6 +830,7 @@ function getDescendentesIds(ativoId){
 let ativosSubTab = 'cadastro';
 let showMotorForm = false, editingMotor = null, motorFormDraft = null, pendingFotoMotorDataUrl = '';
 let motorMoveId = null, motorMoveDestino = '';
+let motorConsertoEnvioId = null, motorConsertoRetornoId = null;
 const STATUS_MOTOR = { reserva:'Em reserva', instalado:'Instalado', atencao:'Aguardando decisão', conserto:'Em conserto', descarte:'Descartado' };
 
 function proximoNumeroRGMotor(){
@@ -840,6 +842,34 @@ function proximoNumeroRGMotor(){
     }
   });
   return 'M' + String(max+1).padStart(4,'0');
+}
+
+/* ---- Métricas de manutenção do motor (consertos, custo, MTBF) ---- */
+function motorQtdConsertos(m){ return (m.consertos||[]).length; }
+
+function motorCustoTotalConserto(m){
+  return (m.consertos||[]).reduce((s,c)=>s + (Number(c.valor)||0), 0);
+}
+
+function formataMoeda(v){
+  return 'R$ ' + Number(v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// MTBF (Tempo Médio Entre Falhas), em dias — média do intervalo entre os envios para
+// conserto, a partir do primeiro registro. Precisa de pelo menos 2 registros de conserto.
+function motorMTBFDias(m){
+  const envios = (m.consertos||[])
+    .map(c=>new Date(c.dataEnvio).getTime())
+    .filter(t=>!isNaN(t))
+    .sort((a,b)=>a-b);
+  if(envios.length<2) return null;
+  const totalMs = envios[envios.length-1] - envios[0];
+  const intervalos = envios.length - 1;
+  return Math.round((totalMs/intervalos) / (1000*60*60*24));
+}
+
+function motorConsertoAberto(m){
+  return (m.consertos||[]).find(c=>!c.dataRetorno) || null;
 }
 
 
@@ -1390,8 +1420,9 @@ function ativosMaisView(){
 function salaMotoresSection(){
   const motores = DB.ativosRG.filter(rg=>rg.tipo==='Motor');
   const outrosRG = DB.ativosRG.filter(rg=>rg.tipo!=='Motor');
-  const motoresReserva = motores.filter(m=>m.status!=='instalado');
+  const motoresReserva = motores.filter(m=>m.status==='reserva' || m.status==='atencao');
   const motoresInstalados = motores.filter(m=>m.status==='instalado');
+  const motoresConserto = motores.filter(m=>m.status==='conserto' || m.status==='descarte');
 
   const busca = salaMotoresBusca.trim().toLowerCase();
   const bate = rg => !busca || [rg.nome, rg.modelo, rg.fabricante, rg.numeroRG].some(v=>(v||'').toLowerCase().includes(busca));
@@ -1400,6 +1431,7 @@ function salaMotoresSection(){
     <button class="btn ${salaMotoresTab==='equipamentos'?'btn-primary':'btn-ghost'} btn-sm" id="tabEquipReserva">Equipamentos reserva (${outrosRG.length})</button>
     <button class="btn ${salaMotoresTab==='motoresReserva'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresReserva">Motores reserva (${motoresReserva.length})</button>
     <button class="btn ${salaMotoresTab==='motoresInstalados'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresInstalados">Motores instalados (${motoresInstalados.length})</button>
+    <button class="btn ${salaMotoresTab==='motoresConserto'?'btn-primary':'btn-ghost'} btn-sm" id="tabMotoresConserto">Conserto / Descarte (${motoresConserto.length})</button>
   </div>`;
 
   html += `<div class="search"><input id="salaMotoresBuscaInput" placeholder="Buscar por nome, modelo, fabricante ou RG" value="${salaMotoresBusca}"></div>`;
@@ -1415,6 +1447,7 @@ function salaMotoresSection(){
     lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
     html += `</div>`;
     if(motorMoveId) html += motorMoveSheet();
+    if(motorConsertoEnvioId) html += consertoEnvioSheet();
     return html;
   }
 
@@ -1425,6 +1458,17 @@ function salaMotoresSection(){
     lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
     html += `</div>`;
     if(motorMoveId) html += motorMoveSheet();
+    return html;
+  }
+
+  if(salaMotoresTab==='motoresConserto'){
+    html += `<div class="note" style="margin-bottom:10px">Motores enviados para conserto (aguardando retorno) ou descartados. Fica separado da reserva disponível para instalação.</div>`;
+    const lista = motoresConserto.filter(bate);
+    if(lista.length===0){ html += `<div class="empty"><div class="icon">🔧</div>Nenhum motor em conserto ou descartado.</div>`; }
+    html += `<div class="card-grid">`;
+    lista.slice().reverse().forEach(m=>{ html += motorCard(m); });
+    html += `</div>`;
+    if(motorConsertoRetornoId) html += consertoRetornoSheet();
     return html;
   }
 
@@ -1468,25 +1512,74 @@ function motorCard(m){
   const statusLabel = STATUS_MOTOR[m.status] || m.status;
   const corPill = m.status==='instalado' ? 'A' : (m.status==='atencao' ? 'B' : (m.status==='conserto' ? 'C' : ''));
   const instaladoEm = m.ativoId ? DB.ativos.find(a=>a.id===m.ativoId) : null;
+  const qtdConsertos = motorQtdConsertos(m);
+  const custoTotal = motorCustoTotalConserto(m);
+  const mtbf = motorMTBFDias(m);
+  const consertoAberto = motorConsertoAberto(m);
+
   return `<div class="tag-card ${m.status==='atencao'?'alert':''}"><div class="inner">
       <div class="row1"><span class="codigo">${m.numeroRG}</span><span class="pill ${corPill}">${statusLabel}</span></div>
       <div class="desc">${m.nome}</div>
       ${m.fabricante||m.modelo?`<div class="note">${m.fabricante||''} ${m.modelo?'· '+m.modelo:''}</div>`:''}
       ${instaladoEm?`<div class="meta"><span>📍 Instalado em: ${instaladoEm.codigo} — ${instaladoEm.nome}</span><span></span></div>`:`<div class="meta"><span>📍 ${m.localizacao||'Sala de Motores'}</span><span></span></div>`}
       <div class="meta"><span>Movimentado ${(m.historico||[]).length}x</span><span></span></div>
+      ${qtdConsertos>0?`<div class="meta"><span>🔧 ${qtdConsertos} conserto${qtdConsertos>1?'s':''}</span><span>${formataMoeda(custoTotal)}</span></div>`:''}
+      ${mtbf!==null?`<div class="meta"><span>MTBF</span><span>${mtbf} dia${mtbf!==1?'s':''}</span></div>`:''}
+
       ${m.status==='atencao'?`<div class="note" style="color:var(--brick)">Este RG saiu de um TAG e precisa de uma decisão.</div>
       <div class="row-2" style="margin-top:8px">
-        <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="conserto">Conserto</button>
+        <button class="btn btn-outline btn-sm motorEnviarConsertoBtn" data-id="${m.id}">Conserto</button>
         <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="descarte">Descarte</button>
       </div>
       <button class="btn btn-ghost btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Manter na Sala de Motores</button>`:''}
-      ${(m.status==='conserto'||m.status==='descarte')?`<button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Voltar para reserva</button>`:''}
+
+      ${m.status==='conserto'?`<div class="note" style="color:var(--amber)">Aguardando retorno${consertoAberto&&consertoAberto.fornecedor?' — Fornecedor: '+consertoAberto.fornecedor:''}${consertoAberto&&consertoAberto.dataEnvio?' (enviado em '+new Date(consertoAberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR')+')':''}</div>
+      <button class="btn btn-primary btn-sm motorRegistrarRetornoBtn" data-id="${m.id}" style="margin-top:8px">Registrar retorno</button>`:''}
+
+      ${m.status==='descarte'?`<div class="note" style="color:var(--brick)">Motor descartado.</div>
+      <button class="btn btn-outline btn-sm motorStatusBtn" data-id="${m.id}" data-status="reserva" style="margin-top:8px">Reativar (voltar para reserva)</button>`:''}
+
       <div class="row-2" style="margin-top:8px">
         ${(m.status==='reserva'||m.status==='instalado')?`<button class="btn btn-amber btn-sm motorMoveBtn" data-id="${m.id}">🔁 Movimentar</button>`:''}
         <button class="btn btn-ghost btn-sm editMotorBtn" data-id="${m.id}">Editar</button>
       </div>
       <button class="btn btn-danger btn-sm deleteMotorBtn" data-id="${m.id}" style="margin-top:8px">Excluir</button>
     </div></div>`;
+}
+
+/* ---- Envio de motor para conserto (fornecedor + data de envio) ---- */
+function consertoEnvioSheet(){
+  const m = DB.ativosRG.find(r=>r.id===motorConsertoEnvioId);
+  if(!m) return '';
+  const hoje = new Date().toISOString().slice(0,10);
+  return `
+  <div class="overlay" id="consertoEnvioOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Enviar ${m.numeroRG} para conserto</h2><button class="close" id="closeConsertoEnvio">×</button></div>
+    <label>Fornecedor / Oficina</label>
+    <input id="consertoFornecedor" placeholder="Ex: Rebobinagem WEG - Oficina Central">
+    <label>Data de envio</label>
+    <input id="consertoDataEnvio" type="date" value="${hoje}">
+    <div class="note">O motor fica em "Aguardando retorno" na aba Conserto / Descarte até você registrar o retorno com o valor gasto.</div>
+    <button class="btn btn-primary" id="confirmConsertoEnvioBtn">Confirmar envio para conserto</button>
+  </div></div>`;
+}
+
+/* ---- Retorno do conserto (valor gasto + destino) ---- */
+function consertoRetornoSheet(){
+  const m = DB.ativosRG.find(r=>r.id===motorConsertoRetornoId);
+  if(!m) return '';
+  const aberto = motorConsertoAberto(m);
+  return `
+  <div class="overlay" id="consertoRetornoOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Retorno do conserto — ${m.numeroRG}</h2><button class="close" id="closeConsertoRetorno">×</button></div>
+    ${aberto?`<div class="note">Enviado para conserto em ${aberto.dataEnvio?new Date(aberto.dataEnvio+'T00:00:00').toLocaleDateString('pt-BR'):'—'}${aberto.fornecedor?' — '+aberto.fornecedor:''}.</div>`:''}
+    <label>Valor gasto no conserto (R$)</label>
+    <input id="consertoValorRetorno" type="number" step="0.01" min="0" placeholder="Ex: 350.00">
+    <div class="row-2" style="margin-top:14px">
+      <button class="btn btn-primary" id="confirmRetornoReservaBtn">Retornar para Sala de Motores</button>
+      <button class="btn btn-danger" id="confirmRetornoDescarteBtn">Tornar inativo (descarte)</button>
+    </div>
+  </div></div>`;
 }
 
 /* ---- Movimentar RG de motor para um ativo (TAG) já cadastrado ---- */
@@ -1517,6 +1610,7 @@ function attachAtivosMaisEvents(){
     const tEquip = document.getElementById('tabEquipReserva'); if(tEquip) tEquip.onclick = ()=>{ salaMotoresTab='equipamentos'; salaMotoresBusca=''; renderView(); };
     const tMotRes = document.getElementById('tabMotoresReserva'); if(tMotRes) tMotRes.onclick = ()=>{ salaMotoresTab='motoresReserva'; salaMotoresBusca=''; renderView(); };
     const tMotInst = document.getElementById('tabMotoresInstalados'); if(tMotInst) tMotInst.onclick = ()=>{ salaMotoresTab='motoresInstalados'; salaMotoresBusca=''; renderView(); };
+    const tMotCons = document.getElementById('tabMotoresConserto'); if(tMotCons) tMotCons.onclick = ()=>{ salaMotoresTab='motoresConserto'; salaMotoresBusca=''; renderView(); };
 
     const buscaInput = document.getElementById('salaMotoresBuscaInput');
     if(buscaInput) buscaInput.oninput = ()=>{ salaMotoresBusca = buscaInput.value; renderView(); const el=document.getElementById('salaMotoresBuscaInput'); if(el){el.focus(); el.setSelectionRange(el.value.length, el.value.length);} };
@@ -1549,6 +1643,50 @@ function attachAtivosMaisEvents(){
         renderView();
       };
     });
+
+    document.querySelectorAll('.motorEnviarConsertoBtn').forEach(b=>{
+      b.onclick = ()=>{ motorConsertoEnvioId=b.dataset.id; renderView(); };
+    });
+    const closeConsertoEnvioBtn = document.getElementById('closeConsertoEnvio');
+    if(closeConsertoEnvioBtn) closeConsertoEnvioBtn.onclick = ()=>{ motorConsertoEnvioId=null; renderView(); };
+    const confirmConsertoEnvioBtn = document.getElementById('confirmConsertoEnvioBtn');
+    if(confirmConsertoEnvioBtn) confirmConsertoEnvioBtn.onclick = async ()=>{
+      const motor = DB.ativosRG.find(r=>r.id===motorConsertoEnvioId);
+      if(!motor) return;
+      const fornecedor = (document.getElementById('consertoFornecedor')||{}).value?.trim() || '';
+      const dataEnvio = (document.getElementById('consertoDataEnvio')||{}).value || new Date().toISOString().slice(0,10);
+      if(!fornecedor){ toast('Preencha o fornecedor/oficina'); return; }
+      if(!motor.consertos) motor.consertos = [];
+      motor.consertos.push({id:uid(), fornecedor, dataEnvio, dataRetorno:null, valor:null});
+      motor.status = 'conserto';
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      motorConsertoEnvioId=null;
+      toast('Motor enviado para conserto'); renderView();
+    };
+
+    document.querySelectorAll('.motorRegistrarRetornoBtn').forEach(b=>{
+      b.onclick = ()=>{ motorConsertoRetornoId=b.dataset.id; renderView(); };
+    });
+    const closeConsertoRetornoBtn = document.getElementById('closeConsertoRetorno');
+    if(closeConsertoRetornoBtn) closeConsertoRetornoBtn.onclick = ()=>{ motorConsertoRetornoId=null; renderView(); };
+
+    const finalizarRetorno = async (novoStatus)=>{
+      const motor = DB.ativosRG.find(r=>r.id===motorConsertoRetornoId);
+      if(!motor) return;
+      const valorInput = document.getElementById('consertoValorRetorno');
+      const valor = valorInput && valorInput.value!=='' ? parseFloat(valorInput.value) : null;
+      const aberto = motorConsertoAberto(motor);
+      if(aberto){ aberto.dataRetorno = new Date().toISOString().slice(0,10); aberto.valor = valor; }
+      motor.status = novoStatus;
+      await saveAll(KEYS.ativosRG, DB.ativosRG);
+      motorConsertoRetornoId=null;
+      toast(novoStatus==='reserva' ? 'Motor retornou para a Sala de Motores' : 'Motor marcado como inativo (descarte)');
+      renderView();
+    };
+    const confirmRetornoReservaBtn = document.getElementById('confirmRetornoReservaBtn');
+    if(confirmRetornoReservaBtn) confirmRetornoReservaBtn.onclick = ()=>finalizarRetorno('reserva');
+    const confirmRetornoDescarteBtn = document.getElementById('confirmRetornoDescarteBtn');
+    if(confirmRetornoDescarteBtn) confirmRetornoDescarteBtn.onclick = ()=>finalizarRetorno('descarte');
 
     const closeMotorBtn = document.getElementById('closeMotorForm');
     if(closeMotorBtn) closeMotorBtn.onclick = ()=>{ showMotorForm=false; editingMotor=null; motorFormDraft=null; pendingFotoMotorDataUrl=''; renderView(); };
@@ -1597,7 +1735,7 @@ function attachAtivosMaisEvents(){
       else {
         DB.ativosRG.push({
           id:uid(), tipo:'Motor', descricaoOutros:'', numeroRG: proximoNumeroRGMotor(),
-          status:'reserva', ativoId:null, historico:[],
+          status:'reserva', ativoId:null, historico:[], consertos:[],
           ...dados, dataCadastro:new Date().toISOString()
         });
       }
