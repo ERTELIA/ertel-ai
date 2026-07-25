@@ -505,6 +505,7 @@ function resetModuleUiState(){
   retiradaSelectedProduto=null; retiradaBusca=''; showScanner=false;
   maisTab='centros'; invItens=[]; invProdutoAtual=null; invBusca=''; invNotFound=false;
   ativoSearch=''; editingAtivo=null; showAtivoForm=false; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; mostrarInativosAtivos=false; prefillAtivoPaiId=''; ativoFormDraft=null;
+  pecasAtivoId=null; editingPeca=null; showPecaForm=false;
 }
 
 function attachModuloSelectorEvents(){
@@ -660,6 +661,71 @@ let mostrarInativosAtivos = false;
 let prefillAtivoPaiId = '';
 let ativoFormDraft = null;
 
+/* ============ PEÇAS DO ATIVO ============ */
+let pecasAtivoId = null;
+let editingPeca = null;
+let showPecaForm = false;
+const STATUS_ESTOQUE_PECA = ['Disponível em estoque','Precisa verificar','Precisa comprar'];
+
+function pecasSheet(){
+  const ativo = DB.ativos.find(a=>a.id===pecasAtivoId);
+  if(!ativo) return '';
+  const pecas = ativo.pecas || [];
+  let html = `<div class="overlay" id="pecasOverlay"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">Peças — ${ativo.codigo}</h2><button class="close" id="closePecasSheet">×</button></div>
+    <div class="note">${ativo.nome}</div>
+
+    <button class="btn btn-primary btn-sm" id="novaPecaBtn" style="margin-top:10px">+ Nova peça</button>
+    <button class="btn btn-outline btn-sm" id="exportPecasBtn">Exportar peças (Excel)</button>
+  `;
+
+  if(showPecaForm){
+    const pc = editingPeca || {tipoMaterial:'',descricao:'',codigoFabricante:'',codigoEstoque:'',quantidade:1,dimensoes:'',existeCadastro:'Não',statusEstoque:''};
+    html += `<div class="card" style="margin-top:12px;border-color:var(--steel)">
+      <label>Tipo de material</label>
+      <input id="pcTipoMaterial" value="${pc.tipoMaterial}" placeholder="Ex: Rolamento, Retentor, Correia">
+      <label>Descrição</label>
+      <input id="pcDescricao" value="${pc.descricao}" placeholder="Ex: Rolamento 6205 ZZ">
+      <label>Código do fabricante</label>
+      <input id="pcCodigoFabricante" value="${pc.codigoFabricante}" placeholder="Ex: SKF 6205-2Z">
+      <label>Código de estoque (se houver)</label>
+      <input id="pcCodigoEstoque" value="${pc.codigoEstoque}" placeholder="Ex: PF1234">
+      <div class="row-2">
+        <div><label>Quantidade</label><input id="pcQuantidade" type="number" value="${pc.quantidade}"></div>
+        <div><label>Dimensões (quando se aplicar)</label><input id="pcDimensoes" value="${pc.dimensoes}" placeholder="Ex: 25x52x15mm"></div>
+      </div>
+      <label>Existe cadastro deste item no estoque?</label>
+      <select id="pcExisteCadastro"><option value="Sim" ${pc.existeCadastro==='Sim'?'selected':''}>Sim</option><option value="Não" ${pc.existeCadastro==='Não'?'selected':''}>Não</option></select>
+      <label>Disponibilidade</label>
+      <select id="pcStatusEstoque"><option value="">Selecione...</option>${STATUS_ESTOQUE_PECA.map(s=>`<option value="${s}" ${pc.statusEstoque===s?'selected':''}>${s}</option>`).join('')}</select>
+      <button class="btn btn-primary btn-sm" id="savePecaBtn">${editingPeca?'Salvar alterações':'Adicionar peça'}</button>
+      <button class="btn btn-ghost btn-sm" id="cancelPecaBtn">Cancelar</button>
+    </div>`;
+  }
+
+  html += `<h2 class="section-title" style="font-size:15px;margin-top:16px">Peças cadastradas (${pecas.length})</h2>`;
+  if(pecas.length===0){ html += `<div class="empty"><div class="icon">🔩</div>Nenhuma peça cadastrada ainda.</div>`; }
+  pecas.forEach(pc=>{
+    const corStatus = pc.statusEstoque==='Disponível em estoque' ? 'A' : (pc.statusEstoque==='Precisa verificar' ? 'B' : (pc.statusEstoque==='Precisa comprar' ? 'C' : ''));
+    html += `<div class="tag-card"><div class="inner">
+      <div class="row1"><span class="codigo">${pc.tipoMaterial||'—'}</span>${pc.statusEstoque?`<span class="pill ${corStatus}">${pc.statusEstoque}</span>`:''}</div>
+      <div class="desc">${pc.descricao}</div>
+      <div class="meta"><span>Fabricante: ${pc.codigoFabricante||'—'}</span><span>Qtd: ${pc.quantidade}</span></div>
+      ${pc.codigoEstoque?`<div class="meta"><span>Cód. estoque: ${pc.codigoEstoque}</span><span></span></div>`:''}
+      ${pc.dimensoes?`<div class="meta"><span>Dimensões: ${pc.dimensoes}</span><span></span></div>`:''}
+      <div class="note">Cadastro no estoque: ${pc.existeCadastro}</div>
+      <div class="row-2" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm editPecaBtn" data-id="${pc.id}">Editar</button>
+        <button class="btn btn-danger btn-sm deletePecaBtn" data-id="${pc.id}">Excluir</button>
+      </div>
+    </div></div>`;
+  });
+
+  html += `</div></div>`;
+  return html;
+}
+
+
 function initAtivoFormDraft(base){
   return {
     codigo: base.codigo||'', nome: base.nome||'', tipo: base.tipo||'',
@@ -770,6 +836,10 @@ function ativosListView(){
         ${isAdmin?`<div class="row-2" style="margin-top:10px">
           <button class="btn btn-ghost btn-sm editAtivo" data-id="${a.id}">Editar</button>
           <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${a.id}">+ Adicionar filho</button>
+        </div>
+        <div class="row-2" style="margin-top:8px">
+          <button class="btn btn-outline btn-sm pecasAtivoBtn" data-id="${a.id}">Peças${(a.pecas&&a.pecas.length)?' ('+a.pecas.length+')':''}</button>
+          <button class="btn btn-outline btn-sm pdfAtivoBtn" data-id="${a.id}">PDF</button>
         </div>`:''}
       </div>
     </div>`;
@@ -782,6 +852,7 @@ function ativosListView(){
   raizes.forEach(a=>{ html += cardAtivo(a, 0); });
 
   if(showAtivoForm && isAdmin) html += ativoFormSheet();
+  if(pecasAtivoId && isAdmin) html += pecasSheet();
   return html;
 }
 
@@ -894,6 +965,66 @@ function attachAtivosEvents(){
   document.querySelectorAll('.addFilhoAtivo').forEach(b=>{
     b.onclick = ()=>{ editingAtivo=null; prefillAtivoPaiId=b.dataset.id; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; showAtivoForm=true; renderView(); };
   });
+
+  document.querySelectorAll('.pecasAtivoBtn').forEach(b=>{
+    b.onclick = ()=>{ pecasAtivoId=b.dataset.id; editingPeca=null; showPecaForm=false; renderView(); };
+  });
+
+  document.querySelectorAll('.pdfAtivoBtn').forEach(b=>{
+    b.onclick = ()=>{ exportAtivoPdf(b.dataset.id); };
+  });
+
+  const closePecasBtn = document.getElementById('closePecasSheet');
+  if(closePecasBtn) closePecasBtn.onclick = ()=>{ pecasAtivoId=null; editingPeca=null; showPecaForm=false; renderView(); };
+
+  const novaPecaBtn = document.getElementById('novaPecaBtn');
+  if(novaPecaBtn) novaPecaBtn.onclick = ()=>{ editingPeca=null; showPecaForm=true; renderView(); };
+
+  const cancelPecaBtn = document.getElementById('cancelPecaBtn');
+  if(cancelPecaBtn) cancelPecaBtn.onclick = ()=>{ editingPeca=null; showPecaForm=false; renderView(); };
+
+  document.querySelectorAll('.editPecaBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const ativo = DB.ativos.find(a=>a.id===pecasAtivoId);
+      editingPeca = ativo.pecas.find(pc=>pc.id===b.dataset.id);
+      showPecaForm=true; renderView();
+    };
+  });
+
+  document.querySelectorAll('.deletePecaBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Excluir esta peça definitivamente?')) return;
+      const ativo = DB.ativos.find(a=>a.id===pecasAtivoId);
+      ativo.pecas = (ativo.pecas||[]).filter(pc=>pc.id!==b.dataset.id);
+      await saveAll(KEYS.ativos, DB.ativos);
+      toast('Peça excluída'); renderView();
+    };
+  });
+
+  const savePecaBtn = document.getElementById('savePecaBtn');
+  if(savePecaBtn) savePecaBtn.onclick = async ()=>{
+    const ativo = DB.ativos.find(a=>a.id===pecasAtivoId);
+    const descricao = document.getElementById('pcDescricao').value.trim();
+    if(!descricao){ toast('Preencha ao menos a descrição da peça'); return; }
+    const dadosPeca = {
+      tipoMaterial: document.getElementById('pcTipoMaterial').value.trim(),
+      descricao,
+      codigoFabricante: document.getElementById('pcCodigoFabricante').value.trim(),
+      codigoEstoque: document.getElementById('pcCodigoEstoque').value.trim(),
+      quantidade: parseFloat(document.getElementById('pcQuantidade').value)||0,
+      dimensoes: document.getElementById('pcDimensoes').value.trim(),
+      existeCadastro: document.getElementById('pcExisteCadastro').value,
+      statusEstoque: document.getElementById('pcStatusEstoque').value
+    };
+    if(!ativo.pecas) ativo.pecas = [];
+    if(editingPeca){ Object.assign(editingPeca, dadosPeca); }
+    else { ativo.pecas.push({id:uid(), ...dadosPeca}); }
+    await saveAll(KEYS.ativos, DB.ativos);
+    editingPeca=null; showPecaForm=false; toast('Peça salva'); renderView();
+  };
+
+  const exportPecasBtn = document.getElementById('exportPecasBtn');
+  if(exportPecasBtn) exportPecasBtn.onclick = ()=>{ exportPecasXlsx(pecasAtivoId); };
 
   const closeBtn = document.getElementById('closeAtivoForm');
   if(closeBtn) closeBtn.onclick = ()=>{ showAtivoForm=false; prefillAtivoPaiId=''; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl=''; renderView(); };
@@ -1233,6 +1364,95 @@ function handleImportAtivosFile(e){
     e.target.value = '';
   };
   reader.readAsArrayBuffer(file);
+}
+
+function exportPecasXlsx(ativoId){
+  if(!window.XLSX){ toast('Biblioteca de planilhas não carregou.'); return; }
+  const ativo = DB.ativos.find(a=>a.id===ativoId);
+  if(!ativo || !ativo.pecas || ativo.pecas.length===0){ toast('Nenhuma peça cadastrada para este ativo'); return; }
+  const rows = ativo.pecas.map(pc=>({
+    'Tipo de Material': pc.tipoMaterial||'', 'Descrição': pc.descricao||'', 'Código do Fabricante': pc.codigoFabricante||'',
+    'Código de Estoque': pc.codigoEstoque||'', 'Quantidade': pc.quantidade||0, 'Dimensões': pc.dimensoes||'',
+    'Existe Cadastro': pc.existeCadastro||'', 'Disponibilidade': pc.statusEstoque||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Peças');
+  XLSX.writeFile(wb, `pecas-${ativo.codigo}-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function exportAtivoPdf(ativoId){
+  if(!window.jspdf){ toast('Biblioteca de PDF não carregou. Verifique sua conexão.'); return; }
+  const ativo = DB.ativos.find(a=>a.id===ativoId);
+  if(!ativo) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 16;
+
+  doc.setFontSize(16); doc.text('ERTEL — Ficha Técnica do Equipamento', 14, y); y += 8;
+  doc.setFontSize(10); doc.text('Gerado em: ' + new Date().toLocaleString('pt-BR'), 14, y); y += 8;
+  doc.line(14, y, 196, y); y += 8;
+
+  // Fotos
+  try{
+    if(ativo.foto){ doc.addImage(ativo.foto, 'JPEG', 14, y, 40, 40); }
+    if(ativo.foto2){ doc.addImage(ativo.foto2, 'JPEG', 58, y, 40, 40); }
+    if(ativo.foto || ativo.foto2) y += 44;
+  }catch(e){ console.error('erro ao inserir foto no pdf', e); }
+
+  doc.setFontSize(13); doc.text(`${ativo.codigo} — ${ativo.nome}`, 14, y); y += 8;
+  doc.setFontSize(10);
+
+  const linha = (label, valor)=>{
+    if(!valor) return;
+    if(y > 280){ doc.addPage(); y = 16; }
+    doc.setFont(undefined,'bold'); doc.text(String(label)+':', 14, y);
+    doc.setFont(undefined,'normal');
+    const texto = doc.splitTextToSize(String(valor), 140);
+    doc.text(texto, 55, y);
+    y += 6*texto.length;
+  };
+
+  linha('Tipo', ativo.tipo);
+  linha('Fabricante', ativo.fabricante);
+  linha('Modelo', ativo.modelo);
+  linha('Número de série', ativo.numeroSerie);
+  linha('Placa de identificação', ativo.placaIdentificacao);
+  linha('Localização', ativo.localizacao);
+  linha('Criticidade', ativo.criticidade);
+  const pai = ativo.ativoPaiId ? DB.ativos.find(x=>x.id===ativo.ativoPaiId) : null;
+  if(pai) linha('Ativo pai', `${pai.codigo} — ${pai.nome}`);
+
+  const especificos = (ativo.tipo && TIPO_CAMPOS_ESPECIFICOS[ativo.tipo]) ? TIPO_CAMPOS_ESPECIFICOS[ativo.tipo] : [];
+  const campos = ativo.campos || {};
+  if(especificos.some(f=>campos[f.id])){
+    y += 2;
+    if(y > 280){ doc.addPage(); y = 16; }
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text('Dados técnicos', 14, y); doc.setFont(undefined,'normal'); doc.setFontSize(10); y += 7;
+    especificos.forEach(f=>{ linha(f.label, campos[f.id]); });
+  }
+
+  linha('Observações', ativo.observacoes);
+
+  const pecas = ativo.pecas || [];
+  if(pecas.length>0){
+    y += 4;
+    if(y > 270){ doc.addPage(); y = 16; }
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.text('Peças cadastradas', 14, y); doc.setFont(undefined,'normal'); doc.setFontSize(9); y += 7;
+    doc.text('Tipo', 14, y); doc.text('Descrição', 44, y); doc.text('Qtd', 110, y); doc.text('Cód. Fabr.', 125, y); doc.text('Status', 165, y);
+    y += 4; doc.line(14, y, 196, y); y += 5;
+    pecas.forEach(pc=>{
+      if(y > 285){ doc.addPage(); y = 16; }
+      doc.text(String(pc.tipoMaterial||'').slice(0,16), 14, y);
+      doc.text(String(pc.descricao||'').slice(0,34), 44, y);
+      doc.text(String(pc.quantidade||0), 110, y);
+      doc.text(String(pc.codigoFabricante||'').slice(0,18), 125, y);
+      doc.text(String(pc.statusEstoque||'').slice(0,16), 165, y);
+      y += 6;
+    });
+  }
+
+  doc.save(`ficha-tecnica-${ativo.codigo}.pdf`);
 }
 
 function exportAtivosXlsx(incluirHierarquia){
