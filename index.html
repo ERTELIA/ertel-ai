@@ -338,7 +338,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:''}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -354,7 +354,7 @@ async function bootstrap(){
   DB.retiradas = await loadAll(KEYS.retiradas, []);
   DB.centros = await loadAll(KEYS.centros, []);
   DB.usuarios = await loadAll(KEYS.usuarios, []);
-  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:''});
+  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100});
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
@@ -464,10 +464,13 @@ const LOGIN_DECOR = `<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/sv
 </svg>`;
 
 // Logo do login: usa a imagem personalizada (Configurações) se tiver sido enviada, senão a engrenagem padrão.
-// A logo personalizada usa um box retangular (sem forçar quadrado) pra não espremer logos largas.
+// A logo personalizada usa um box retangular (sem forçar quadrado) pra não espremer logos largas,
+// com tamanho ajustável pelo controle de escala (loginLogoScale, em %).
 function loginLogoMarkup(){
   if(DB.config && DB.config.loginLogoImage){
-    return `<div class="custom-logo-badge"><img src="${DB.config.loginLogoImage}"></div>`;
+    const escala = (DB.config.loginLogoScale||100)/100;
+    const w = Math.round(260*escala), h = Math.round(110*escala);
+    return `<div class="custom-logo-badge" style="max-width:${w}px;max-height:${h}px"><img src="${DB.config.loginLogoImage}" style="max-width:${w}px;max-height:${h}px"></div>`;
   }
   return `<div class="gear-badge">${LOGO_MARK}</div>`;
 }
@@ -3315,8 +3318,11 @@ function maisView(){
         </div>
         <input type="file" accept="image/*" id="loginLogoFile" style="flex:1">
       </div>
-      <div class="note">Prefira PNG com fundo transparente. A logo aparece em tamanho maior na tela de login (até 260×110px).</div>
-      ${DB.config.loginLogoImage?`<button class="btn btn-ghost btn-sm" id="removeLoginLogoBtn" style="margin-top:8px">Remover logo personalizada</button>`:''}
+      <div class="note">Prefira PNG com fundo transparente.</div>
+      ${DB.config.loginLogoImage?`
+      <label style="margin-top:10px">Tamanho da logo na tela de login: <b>${DB.config.loginLogoScale||100}%</b></label>
+      <input type="range" id="loginLogoScaleRange" min="50" max="300" step="10" value="${DB.config.loginLogoScale||100}" style="width:100%">
+      <button class="btn btn-ghost btn-sm" id="removeLoginLogoBtn" style="margin-top:8px">Remover logo personalizada</button>`:''}
 
       <label style="margin-top:14px">Imagem de fundo</label>
       ${DB.config.loginBackgroundImage?`<img src="${DB.config.loginBackgroundImage}" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;border:1px solid var(--line);margin-bottom:8px">`:''}
@@ -3465,8 +3471,16 @@ function attachMaisEvents(){
   const removeLoginLogoBtn = document.getElementById('removeLoginLogoBtn');
   if(removeLoginLogoBtn) removeLoginLogoBtn.onclick = async ()=>{
     DB.config.loginLogoImage = '';
+    DB.config.loginLogoScale = 100;
     await saveAll(KEYS.config, DB.config);
     toast('Logo personalizada removida — voltou ao padrão'); renderView();
+  };
+
+  const loginLogoScaleRange = document.getElementById('loginLogoScaleRange');
+  if(loginLogoScaleRange) loginLogoScaleRange.onchange = async ()=>{
+    DB.config.loginLogoScale = parseInt(loginLogoScaleRange.value, 10);
+    await saveAll(KEYS.config, DB.config);
+    renderView();
   };
 
   const loginBackgroundFile = document.getElementById('loginBackgroundFile');
