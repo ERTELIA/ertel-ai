@@ -167,7 +167,7 @@
   .empty .icon{font-size:34px;margin-bottom:8px;}
 
   /* Login */
-  .login-wrap{min-height:100vh;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:36px 24px;
+  .login-wrap{min-height:100vh;position:relative;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;justify-content:center;padding:36px 24px;
     background:
       radial-gradient(ellipse at 78% 12%, rgba(70,140,220,.30), transparent 55%),
       radial-gradient(ellipse at 90% 75%, rgba(232,163,61,.12), transparent 55%),
@@ -248,6 +248,14 @@
     .tag-card{max-width:420px;}
     .overlay{align-items:center;padding:20px;}
     .sheet{max-width:560px;border-radius:16px;max-height:85vh;}
+
+    /* Login/seletor de módulo no computador: ancorado mais pro topo (não centralizado por vh,
+       que empurrava tudo pra baixo em janelas largas e baixas) e com uma moldura pra parecer
+       um sistema de verdade, não um texto flutuando solto no fundo. */
+    .login-wrap{justify-content:flex-start;align-items:center;padding-top:64px;}
+    .login-content{background:rgba(8,12,19,.58);border:1px solid rgba(255,255,255,.08);border-radius:20px;
+      padding:40px 46px 34px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      box-shadow:0 24px 70px rgba(0,0,0,.5);}
   }
 
   /* ============ RESPONSIVO — TABLET LANDSCAPE / DESKTOP (>=980px) — navegação vira barra lateral ============ */
