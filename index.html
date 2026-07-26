@@ -47,6 +47,7 @@
     --amber:#C97D1B;
     --amber-dark:#A6650F;
     --info-text:#2E6FBE;
+    --steel-dark:#1E3A5C;
   }
   #app.theme-light .pill.A{background:rgba(22,163,74,.12);color:#15803D;}
   #app.theme-light .pill.B{background:rgba(217,119,6,.14);color:#B45309;}
@@ -89,8 +90,8 @@
   .tag-card .codigo{font-family:var(--font-mono);font-size:11px;color:var(--info-text);background:rgba(62,142,224,.12);padding:2px 6px;border-radius:4px;letter-spacing:.5px;}
   .tag-card .desc{font-weight:600;font-size:14.5px;margin-top:5px;color:var(--ink);}
   .tag-card .meta{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);}
-  .tag-card .qtd{font-weight:700;color:var(--ink);}
-  .tag-card .qtd.low{color:var(--brick);}
+  .qtd{font-weight:700;color:var(--ink);}
+  .qtd.low{color:var(--brick);}
   .pill{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:20px;letter-spacing:.4px;}
   .pill.A{background:rgba(52,199,123,.15);color:#4ADE80;}
   .pill.B{background:rgba(232,163,61,.18);color:#F0B44E;}
@@ -102,7 +103,7 @@
   .metric .val{font-family:var(--font-display);font-size:26px;font-weight:700;overflow-wrap:break-word;}
   .metric .lbl{font-size:10.5px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
   .metric.amber{background:linear-gradient(160deg,#3a2a10,#241a08);border-color:rgba(232,163,61,.25);}
-  .ranking-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;}
+  .ranking-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;color:var(--ink);}
   .ranking-row span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ranking-row span:last-child{flex-shrink:0;}
   @media (max-width:420px){
@@ -138,7 +139,7 @@
   .tabs-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 
   /* Lista compacta de Ativos */
-  .ativo-row{display:flex;align-items:center;gap:9px;padding:10px 8px;border-bottom:1px solid var(--paper-2);cursor:pointer;border-left:3px solid transparent;}
+  .ativo-row{display:flex;align-items:center;gap:9px;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;color:var(--ink);}
   .ativo-row:hover{background:var(--paper-2);}
   .ativo-row.selecionado{background:rgba(232,163,61,.10);border-left:3px solid var(--amber);}
   .ativo-expand-btn{width:22px;height:22px;flex-shrink:0;border-radius:6px;border:1px solid var(--line);background:var(--paper-2);
@@ -233,7 +234,7 @@
   .link-btn{background:none;border:none;color:var(--steel);text-decoration:underline;font-size:12.5px;cursor:pointer;padding:0;}
   table.abc{width:100%;border-collapse:collapse;font-size:12.5px;}
   table.abc th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);padding:4px 4px;border-bottom:1px solid var(--line);}
-  table.abc td{padding:6px 4px;border-bottom:1px solid var(--paper-2);}
+  table.abc td{padding:6px 4px;border-bottom:1px solid var(--line);color:var(--ink);}
 
   /* ============ RESPONSIVO — TABLET (>=700px) ============ */
   @media (min-width:700px){
@@ -844,10 +845,10 @@ function ativosDashboardView(){
   </div>`;
 
   html += `<h2 class="section-title">Criticidade ABC</h2><div class="card">
-    <div style="display:flex;justify-content:space-between;padding:6px 0"><span><span class="pill A">A</span> Alta</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.A} (${pct(critCount.A)}%)</span></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill B">B</span> Média</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.B} (${pct(critCount.B)}%)</span></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill C">C</span> Baixa</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.C} (${pct(critCount.C)}%)</span></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span>Não classificado</span><span class="qtd" style="font-family:var(--font-mono)">${critCount['']} (${pct(critCount[''])}%)</span></div>
+    <div class="ranking-row"><span><span class="pill A">A</span> Alta</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.A} (${pct(critCount.A)}%)</span></div>
+    <div class="ranking-row" style="border-top:1px solid var(--line)"><span><span class="pill B">B</span> Média</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.B} (${pct(critCount.B)}%)</span></div>
+    <div class="ranking-row" style="border-top:1px solid var(--line)"><span><span class="pill C">C</span> Baixa</span><span class="qtd" style="font-family:var(--font-mono)">${critCount.C} (${pct(critCount.C)}%)</span></div>
+    <div class="ranking-row" style="border-top:1px solid var(--line)"><span>Não classificado</span><span class="qtd" style="font-family:var(--font-mono)">${critCount['']} (${pct(critCount[''])}%)</span></div>
   </div>`;
 
   html += `<h2 class="section-title">Completude do Cadastro</h2><div class="card">
@@ -904,7 +905,7 @@ function ativosDashboardView(){
   if(ranking.length>0){
     html += `<h2 class="section-title">Top 5 — Maior custo de manutenção</h2><div class="card">`;
     ranking.forEach((rg,i)=>{
-      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${i+1}. ${rg.numeroRG} — ${rg.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${formataMoeda(motorCustoTotalConserto(rg))}</span></div>`;
+      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--line)':''}"><span>${i+1}. ${rg.numeroRG} — ${rg.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${formataMoeda(motorCustoTotalConserto(rg))}</span></div>`;
     });
     html += `</div>`;
   }
@@ -918,7 +919,7 @@ function ativosDashboardView(){
   if(tiposEntries.length>0){
     html += `<h2 class="section-title">Estoque de reserva por tipo</h2><div class="card">`;
     tiposEntries.forEach(([tipo,qtd],i)=>{
-      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${tipo}</span><span class="qtd" style="font-family:var(--font-mono)">${qtd} disponíve${qtd>1?'is':'l'}</span></div>`;
+      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--line)':''}"><span>${tipo}</span><span class="qtd" style="font-family:var(--font-mono)">${qtd} disponíve${qtd>1?'is':'l'}</span></div>`;
     });
     html += `</div>`;
   }
@@ -2878,18 +2879,18 @@ function dashboardView(){
 
   html += `<h2 class="section-title">Top 5 — Mais Rotatividade</h2><div class="card">`;
   if(top5.length===0) html += `<div class="note">Ainda sem retiradas registradas.</div>`;
-  top5.forEach((t,i)=>{ html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${i+1}. ${t.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${t.qtd} un.</span></div>`; });
+  top5.forEach((t,i)=>{ html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--line)':''}"><span>${i+1}. ${t.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${t.qtd} un.</span></div>`; });
   html += `</div>`;
 
   html += `<h2 class="section-title">Classificação ABC</h2><div class="card">
-    <div style="display:flex;justify-content:space-between;padding:6px 0"><span><span class="pill A">A</span> Maior valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.A} produtos</span></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill B">B</span> Valor médio</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.B} produtos</span></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--paper-2)"><span><span class="pill C">C</span> Menor valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.C} produtos</span></div>
+    <div class="ranking-row"><span><span class="pill A">A</span> Maior valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.A} produtos</span></div>
+    <div class="ranking-row" style="border-top:1px solid var(--line)"><span><span class="pill B">B</span> Valor médio</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.B} produtos</span></div>
+    <div class="ranking-row" style="border-top:1px solid var(--line)"><span><span class="pill C">C</span> Menor valor</span><span class="qtd" style="font-family:var(--font-mono)">${abcCount.C} produtos</span></div>
   </div>`;
 
   if(centrosRank.length>0){
     html += `<h2 class="section-title">Consumo por Centro de Custo (mês)</h2><div class="card">`;
-    centrosRank.forEach((c,i)=>{ html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${c.nome}</span><span style="font-family:var(--font-mono)">${money(c.val)}</span></div>`; });
+    centrosRank.forEach((c,i)=>{ html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--line)':''}"><span>${c.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${money(c.val)}</span></div>`; });
     html += `</div>`;
   }
 
@@ -3841,7 +3842,7 @@ function graficoLubSection(){
       <div class="row1" style="align-items:center"><b>${nome}</b><span style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">Total: ${Math.round(dados.total*100)/100}</span></div>
       <div style="margin-top:8px">`;
     Object.entries(dados.itens).sort((a,b)=>b[1].valor-a[1].valor).forEach(([nomeItem, v])=>{
-      html += `<div class="meta" style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--paper-2)"><span>${nomeItem}</span><span style="font-family:var(--font-mono)">${Math.round(v.valor*100)/100} ${v.unidade||''}</span></div>`;
+      html += `<div class="meta" style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--line);color:var(--ink)"><span>${nomeItem}</span><span style="font-family:var(--font-mono)">${Math.round(v.valor*100)/100} ${v.unidade||''}</span></div>`;
     });
     html += `</div></div>`;
   });
