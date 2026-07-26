@@ -52,7 +52,7 @@
   #app.theme-light .pill.B{background:rgba(217,119,6,.14);color:#B45309;}
   #app.theme-light .pill.C{background:rgba(220,38,38,.12);color:#B91C1C;}
   #app.theme-light input::placeholder, #app.theme-light textarea::placeholder{color:rgba(28,35,46,.35);}
-  #app.theme-light select{color-scheme:light;}
+  #app.theme-light{color-scheme:light;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
   #app{width:100%;margin:0 auto;min-height:100vh;background:
       radial-gradient(ellipse at 85% 0%, rgba(62,142,224,.10), transparent 45%),
@@ -367,7 +367,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -383,7 +383,7 @@ async function bootstrap(){
   DB.retiradas = await loadAll(KEYS.retiradas, []);
   DB.centros = await loadAll(KEYS.centros, []);
   DB.usuarios = await loadAll(KEYS.usuarios, []);
-  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0});
+  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0});
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
@@ -492,6 +492,22 @@ const LOGIN_DECOR = `<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/sv
   </g>
 </svg>`;
 
+// Estilo do título ERTEL (texto, fonte, tamanho, cor e posição personalizáveis em Configurações).
+// Sem cor customizada, mantém o degradê padrão; com cor customizada, aplica cor sólida.
+function tituloWordStyle(){
+  const fs = DB.config.tituloFontSize || 38;
+  const ff = DB.config.tituloFontFamily || "'Barlow Condensed', sans-serif";
+  const ox = DB.config.tituloOffsetX || 0;
+  const oy = DB.config.tituloOffsetY || 0;
+  const cor = DB.config.tituloCor;
+  const corCss = cor
+    ? `background:none;-webkit-background-clip:initial;background-clip:initial;color:${cor};`
+    : '';
+  return `font-family:${ff};font-size:${fs}px;transform:translate(${ox}px,${oy}px);${corCss}`;
+}
+function tituloTexto(){ return (DB.config.tituloTexto||'').trim() || 'ERTEL'; }
+function tituloSubtexto(){ return (DB.config.tituloSubtexto||'').trim() || 'CONTROLE DE ESTOQUE'; }
+
 // Logo do login: usa a imagem personalizada (Configurações) se tiver sido enviada, senão a engrenagem padrão.
 // A logo personalizada usa um box retangular (sem forçar quadrado) pra não espremer logos largas,
 // com tamanho ajustável (loginLogoScale, em %) e posição ajustável (loginLogoOffsetX/Y, em px).
@@ -572,7 +588,7 @@ function render(){
   app.classList.add('theme-light');
   app.innerHTML = `
     <div class="topbar">
-      <div class="brand"><span class="tag"></span>ERTEL</div>
+      <div class="brand"><span class="tag"></span>${tituloTexto()}</div>
       <div class="sub">${rotulo}${temMaisDeUmModulo?` · <button class="link-btn" id="trocarModuloBtn" style="color:inherit;opacity:.85">trocar módulo</button>`:''}</div>
       <div class="userchip" id="logoutBtn">${currentUser.nome}<br>(${roleLabel()}) · sair</div>
     </div>
@@ -609,7 +625,7 @@ function moduloSelectorScreen(){
   <div class="login-wrap"${loginBackgroundStyleAttr()}><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
       ${loginLogoMarkup()}
-      <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">SELECIONE O ACESSO</div></div>
+      <div class="login-brand2"><div class="word" style="${tituloWordStyle()}">${tituloTexto()}</div><div class="sub">SELECIONE O ACESSO</div></div>
     </div>
     <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
 
@@ -2665,7 +2681,7 @@ function loginScreen(){
   <div class="login-wrap"${loginBackgroundStyleAttr()}><div class="login-decor">${LOGIN_DECOR}</div><div class="login-content">
     <div class="login-logo-row">
       ${loginLogoMarkup()}
-      <div class="login-brand2"><div class="word">ERTEL</div><div class="sub">CONTROLE DE ESTOQUE</div></div>
+      <div class="login-brand2"><div class="word" style="${tituloWordStyle()}">${tituloTexto()}</div><div class="sub">${tituloSubtexto()}</div></div>
     </div>
     <div class="login-tagline">Inteligência e precisão para o controle do seu estoque.</div>
 
@@ -3364,6 +3380,36 @@ function maisView(){
       <input type="file" accept="image/*" id="loginBackgroundFile">
       ${DB.config.loginBackgroundImage?`<button class="btn btn-ghost btn-sm" id="removeLoginBackgroundBtn" style="margin-top:8px">Remover imagem de fundo</button>`:''}
     </div>`;
+    html += `<div class="card">
+      <div class="row1"><b>Personalização do título (ERTEL)</b></div>
+      <div class="note">Vale para a tela de login e a tela de seleção de módulo (o subtítulo só aparece no login).</div>
+      <label style="margin-top:10px">Texto do título</label>
+      <input id="tituloTextoInput" value="${DB.config.tituloTexto||''}" placeholder="ERTEL">
+      <label>Subtítulo (só na tela de login)</label>
+      <input id="tituloSubtextoInput" value="${DB.config.tituloSubtexto||''}" placeholder="CONTROLE DE ESTOQUE">
+      <label style="margin-top:10px">Tamanho da fonte: <b>${DB.config.tituloFontSize||38}px</b></label>
+      <input type="range" id="tituloFontSizeRange" min="20" max="70" step="2" value="${DB.config.tituloFontSize||38}" style="width:100%">
+      <label>Tipo de fonte</label>
+      <select id="tituloFontFamilySelect">
+        <option value="" ${!DB.config.tituloFontFamily?'selected':''}>Barlow Condensed (padrão)</option>
+        <option value="'Inter', sans-serif" ${DB.config.tituloFontFamily==="'Inter', sans-serif"?'selected':''}>Inter</option>
+        <option value="'Roboto Mono', monospace" ${DB.config.tituloFontFamily==="'Roboto Mono', monospace"?'selected':''}>Roboto Mono</option>
+        <option value="Georgia, serif" ${DB.config.tituloFontFamily==="Georgia, serif"?'selected':''}>Georgia</option>
+        <option value="Arial, sans-serif" ${DB.config.tituloFontFamily==="Arial, sans-serif"?'selected':''}>Arial</option>
+        <option value="'Times New Roman', serif" ${DB.config.tituloFontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option>
+      </select>
+      <label style="margin-top:10px">Cor do texto</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="tituloCorInput" value="${DB.config.tituloCor||'#F2F4F7'}" style="width:52px;height:40px;padding:4px;flex-shrink:0">
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" id="tituloCorPadraoChk" ${!DB.config.tituloCor?'checked':''}> Usar degradê padrão</label>
+      </div>
+      <label style="margin-top:10px">Posição horizontal: <b>${DB.config.tituloOffsetX||0}px</b></label>
+      <input type="range" id="tituloOffsetXRange" min="-100" max="100" step="5" value="${DB.config.tituloOffsetX||0}" style="width:100%">
+      <label>Posição vertical: <b>${DB.config.tituloOffsetY||0}px</b></label>
+      <input type="range" id="tituloOffsetYRange" min="-60" max="60" step="5" value="${DB.config.tituloOffsetY||0}" style="width:100%">
+      <button class="btn btn-primary btn-sm" id="saveTituloBtn">Salvar personalização do título</button>
+      <button class="btn btn-ghost btn-sm" id="resetTituloBtn">Restaurar padrão</button>
+    </div>`;
     html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Usuários cadastrados</h2>`;
     DB.usuarios.forEach(u=>{
       html += `<div class="card">
@@ -3549,6 +3595,28 @@ function attachMaisEvents(){
     DB.config.loginBackgroundImage = '';
     await saveAll(KEYS.config, DB.config);
     toast('Imagem de fundo removida — voltou ao padrão'); renderView();
+  };
+
+  const saveTituloBtn = document.getElementById('saveTituloBtn');
+  if(saveTituloBtn) saveTituloBtn.onclick = async ()=>{
+    DB.config.tituloTexto = document.getElementById('tituloTextoInput').value.trim();
+    DB.config.tituloSubtexto = document.getElementById('tituloSubtextoInput').value.trim();
+    DB.config.tituloFontSize = parseInt(document.getElementById('tituloFontSizeRange').value, 10);
+    DB.config.tituloFontFamily = document.getElementById('tituloFontFamilySelect').value;
+    const usarPadrao = document.getElementById('tituloCorPadraoChk').checked;
+    DB.config.tituloCor = usarPadrao ? '' : document.getElementById('tituloCorInput').value;
+    DB.config.tituloOffsetX = parseInt(document.getElementById('tituloOffsetXRange').value, 10);
+    DB.config.tituloOffsetY = parseInt(document.getElementById('tituloOffsetYRange').value, 10);
+    await saveAll(KEYS.config, DB.config);
+    toast('Personalização do título salva'); renderView();
+  };
+
+  const resetTituloBtn = document.getElementById('resetTituloBtn');
+  if(resetTituloBtn) resetTituloBtn.onclick = async ()=>{
+    DB.config.tituloTexto = ''; DB.config.tituloSubtexto = ''; DB.config.tituloFontSize = 38;
+    DB.config.tituloFontFamily = ''; DB.config.tituloCor = ''; DB.config.tituloOffsetX = 0; DB.config.tituloOffsetY = 0;
+    await saveAll(KEYS.config, DB.config);
+    toast('Título restaurado ao padrão'); renderView();
   };
 
   document.querySelectorAll('.saveCred').forEach(b=>{
