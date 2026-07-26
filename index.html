@@ -26,6 +26,7 @@
     --amber-dark:#B9791F;
     --brick:#EF5B5B;
     --moss:#34C77B;
+    --info-text:#7FB4EE;
     --white:#FFFFFF;
     --radius:10px;
     --font-display:'Barlow Condensed', sans-serif;
@@ -33,6 +34,25 @@
     --font-mono:'Roboto Mono', monospace;
   }
   *{box-sizing:border-box;}
+
+  /* Tema claro — aplicado só na área do app depois do login/seleção de módulo.
+     A tela de login e o seletor de módulo continuam escuros de propósito. */
+  #app.theme-light{
+    --ink:#1C232E;
+    --muted:#5B6472;
+    --paper:#F3F4F7;
+    --paper-2:#FFFFFF;
+    --panel:#FFFFFF;
+    --line:rgba(20,28,40,.12);
+    --amber:#C97D1B;
+    --amber-dark:#A6650F;
+    --info-text:#2E6FBE;
+  }
+  #app.theme-light .pill.A{background:rgba(22,163,74,.12);color:#15803D;}
+  #app.theme-light .pill.B{background:rgba(217,119,6,.14);color:#B45309;}
+  #app.theme-light .pill.C{background:rgba(220,38,38,.12);color:#B91C1C;}
+  #app.theme-light input::placeholder, #app.theme-light textarea::placeholder{color:rgba(28,35,46,.35);}
+  #app.theme-light select{color-scheme:light;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;}
   #app{width:100%;margin:0 auto;min-height:100vh;background:
       radial-gradient(ellipse at 85% 0%, rgba(62,142,224,.10), transparent 45%),
@@ -66,7 +86,7 @@
   .tag-card.alert::before{background:var(--brick);box-shadow:0 0 8px rgba(239,91,91,.5);}
   .tag-card .inner{padding:12px 14px 12px 16px;}
   .tag-card .row1{display:flex;justify-content:space-between;align-items:baseline;}
-  .tag-card .codigo{font-family:var(--font-mono);font-size:11px;color:#7FB4EE;background:rgba(62,142,224,.12);padding:2px 6px;border-radius:4px;letter-spacing:.5px;}
+  .tag-card .codigo{font-family:var(--font-mono);font-size:11px;color:var(--info-text);background:rgba(62,142,224,.12);padding:2px 6px;border-radius:4px;letter-spacing:.5px;}
   .tag-card .desc{font-weight:600;font-size:14.5px;margin-top:5px;color:var(--ink);}
   .tag-card .meta{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--muted);}
   .tag-card .qtd{font-weight:700;color:var(--ink);}
@@ -78,10 +98,19 @@
 
   /* Metrics grid */
   .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;}
-  .metric{background:linear-gradient(160deg,#122036,#0B111C);border:1px solid rgba(62,142,224,.18);color:var(--white);border-radius:var(--radius);padding:14px;}
-  .metric .val{font-family:var(--font-display);font-size:26px;font-weight:700;}
+  .metric{background:linear-gradient(160deg,#122036,#0B111C);border:1px solid rgba(62,142,224,.18);color:var(--white);border-radius:var(--radius);padding:14px;min-width:0;}
+  .metric .val{font-family:var(--font-display);font-size:26px;font-weight:700;overflow-wrap:break-word;}
   .metric .lbl{font-size:10.5px;opacity:.65;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
   .metric.amber{background:linear-gradient(160deg,#3a2a10,#241a08);border-color:rgba(232,163,61,.25);}
+  .ranking-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;}
+  .ranking-row span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ranking-row span:last-child{flex-shrink:0;}
+  @media (max-width:420px){
+    .metrics{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px;}
+    .metric{padding:10px 12px;}
+    .metric .val{font-size:19px;}
+    .metric .lbl{font-size:9px;}
+  }
 
   /* Grid de cartões (produtos, ativos, histórico etc.) — 1 coluna no celular, várias em telas maiores */
   .card-grid{display:block;}
@@ -97,7 +126,7 @@
   .btn-primary{background:linear-gradient(180deg,#4C97E6,#2E6FBE);color:var(--white);box-shadow:0 4px 14px rgba(62,142,224,.28);}
   .btn-primary:active{background:var(--steel-dark);}
   .btn-amber{background:linear-gradient(180deg,#F0A83E,#D9791E);color:#1B1305;box-shadow:0 4px 14px rgba(217,121,30,.28);}
-  .btn-outline{background:none;border:1.5px solid var(--steel);color:#7FB4EE;}
+  .btn-outline{background:none;border:1.5px solid var(--steel);color:var(--info-text);}
   .btn-ghost{background:var(--paper-2);color:var(--ink);border:1px solid var(--line);}
   .btn-danger{background:linear-gradient(180deg,#F16A6A,#D64545);color:var(--white);}
   .btn-sm{padding:8px;font-size:12.5px;margin-top:8px;}
@@ -338,7 +367,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -354,7 +383,7 @@ async function bootstrap(){
   DB.retiradas = await loadAll(KEYS.retiradas, []);
   DB.centros = await loadAll(KEYS.centros, []);
   DB.usuarios = await loadAll(KEYS.usuarios, []);
-  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100});
+  DB.config = await loadAll(KEYS.config, {whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0});
   DB.produtosLub = await loadAll(KEYS.produtosLub, []);
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
@@ -465,12 +494,13 @@ const LOGIN_DECOR = `<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/sv
 
 // Logo do login: usa a imagem personalizada (Configurações) se tiver sido enviada, senão a engrenagem padrão.
 // A logo personalizada usa um box retangular (sem forçar quadrado) pra não espremer logos largas,
-// com tamanho ajustável pelo controle de escala (loginLogoScale, em %).
+// com tamanho ajustável (loginLogoScale, em %) e posição ajustável (loginLogoOffsetX/Y, em px).
 function loginLogoMarkup(){
   if(DB.config && DB.config.loginLogoImage){
     const escala = (DB.config.loginLogoScale||100)/100;
     const w = Math.round(260*escala), h = Math.round(110*escala);
-    return `<div class="custom-logo-badge" style="max-width:${w}px;max-height:${h}px"><img src="${DB.config.loginLogoImage}" style="max-width:${w}px;max-height:${h}px"></div>`;
+    const ox = DB.config.loginLogoOffsetX||0, oy = DB.config.loginLogoOffsetY||0;
+    return `<div class="custom-logo-badge" style="max-width:${w}px;max-height:${h}px;transform:translate(${ox}px,${oy}px)"><img src="${DB.config.loginLogoImage}" style="max-width:${w}px;max-height:${h}px"></div>`;
   }
   return `<div class="gear-badge">${LOGO_MARK}</div>`;
 }
@@ -513,7 +543,7 @@ const ICONS = {
 /* ============ ROOT RENDER ============ */
 function render(){
   const app = document.getElementById('app');
-  if(!currentUser){ app.innerHTML = loginScreen(); attachLoginEvents(); return; }
+  if(!currentUser){ app.classList.remove('theme-light'); app.innerHTML = loginScreen(); attachLoginEvents(); return; }
   if(!moduloAtivo){
     const uAtual = DB.usuarios.find(x=>x.id===currentUser.id);
     const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
@@ -524,7 +554,7 @@ function render(){
       if(permitidos.length===1){ moduloAtivo=permitidos[0]; resetModuleUiState(); }
     }
   }
-  if(!moduloAtivo){ app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
+  if(!moduloAtivo){ app.classList.remove('theme-light'); app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
   const uAtualTop = DB.usuarios.find(x=>x.id===currentUser.id);
   const modulosDoUsuario = uAtualTop && uAtualTop.master ? ['mro','lub','ativos'] : ['mro','lub','ativos'].filter(m=>usuarioTemAcessoModulo(uAtualTop, m));
   const temMaisDeUmModulo = modulosDoUsuario.length > 1;
@@ -539,6 +569,7 @@ function render(){
        <button data-v="retirada"><span>${ICONS.out}</span>Retirar</button>
        <button data-v="historico"><span>${ICONS.hist}</span>Histórico</button>
        <button data-v="mais"><span>${ICONS.more}</span>Mais</button>`;
+  app.classList.add('theme-light');
   app.innerHTML = `
     <div class="topbar">
       <div class="brand"><span class="tag"></span>ERTEL</div>
@@ -582,19 +613,19 @@ function moduloSelectorScreen(){
     </div>
     <div class="login-tagline">Olá, ${currentUser.nome}. Escolha onde deseja trabalhar.</div>
 
-    ${podeMro?`<div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+    ${podeMro?`<div class="card modSelCard" data-mod="mro" style="cursor:pointer;background:var(--panel);border:1.5px solid rgba(255,255,255,.22)">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="desc" style="font-size:17px">${ICONS.box} Estoque MRO</div><div class="note">Peças, materiais e manutenção geral</div></div>
+        <div><div class="desc" style="font-size:17px;display:flex;align-items:center;gap:8px"><span style="display:inline-flex;width:18px;height:18px;flex-shrink:0">${ICONS.box}</span> Estoque MRO</div><div class="note">Peças, materiais e manutenção geral</div></div>
         ${isAdminLevel() && alertasMro>0?`<span class="pill C">${alertasMro} alerta${alertasMro>1?'s':''}</span>`:''}
       </div>
     </div>`:''}
-    ${podeLub?`<div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+    ${podeLub?`<div class="card modSelCard" data-mod="lub" style="cursor:pointer;background:var(--panel);border:1.5px solid rgba(255,255,255,.22)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">🛢️ Sala de Lubrificantes</div><div class="note">Óleos e lubrificantes</div></div>
         ${isAdminLevel() && alertasLub>0?`<span class="pill C">${alertasLub} alerta${alertasLub>1?'s':''}</span>`:''}
       </div>
     </div>`:''}
-    ${podeAtivos?`<div class="card modSelCard" data-mod="ativos" style="cursor:pointer;background:var(--panel);border:1.5px solid var(--line)">
+    ${podeAtivos?`<div class="card modSelCard" data-mod="ativos" style="cursor:pointer;background:var(--panel);border:1.5px solid rgba(255,255,255,.22)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><div class="desc" style="font-size:17px">⚙️ Cadastro de Ativos</div><div class="note">Máquinas, motores, redutores, bombas, esteiras</div></div>
       </div>
@@ -857,7 +888,7 @@ function ativosDashboardView(){
   if(ranking.length>0){
     html += `<h2 class="section-title">Top 5 — Maior custo de manutenção</h2><div class="card">`;
     ranking.forEach((rg,i)=>{
-      html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${i+1}. ${rg.numeroRG} — ${rg.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${formataMoeda(motorCustoTotalConserto(rg))}</span></div>`;
+      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${i+1}. ${rg.numeroRG} — ${rg.nome}</span><span class="qtd" style="font-family:var(--font-mono)">${formataMoeda(motorCustoTotalConserto(rg))}</span></div>`;
     });
     html += `</div>`;
   }
@@ -871,7 +902,7 @@ function ativosDashboardView(){
   if(tiposEntries.length>0){
     html += `<h2 class="section-title">Estoque de reserva por tipo</h2><div class="card">`;
     tiposEntries.forEach(([tipo,qtd],i)=>{
-      html += `<div style="display:flex;justify-content:space-between;padding:6px 0;${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${tipo}</span><span class="qtd" style="font-family:var(--font-mono)">${qtd} disponíve${qtd>1?'is':'l'}</span></div>`;
+      html += `<div class="ranking-row" style="${i>0?'border-top:1px solid var(--paper-2)':''}"><span>${tipo}</span><span class="qtd" style="font-family:var(--font-mono)">${qtd} disponíve${qtd>1?'is':'l'}</span></div>`;
     });
     html += `</div>`;
   }
@@ -1164,7 +1195,7 @@ function ativosListView(){
       html += `<div class="ativo-action-bar">
         <div class="ativo-action-bar-title"><span><b>${sel.codigo}</b> — ${sel.nome}${pai?` <span style="color:var(--muted)">(filho de ${pai.codigo})</span>`:''}</span>
         <button class="btn btn-ghost btn-sm" id="fecharAcaoAtivoBtn" style="width:auto;margin:0;padding:4px 10px">×</button></div>
-        ${sel.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===sel.motorInstaladoId); return m?`<div class="note" style="color:#7FB4EE;margin-bottom:8px">⚙️ ${m.tipo==='Motor'?'Motor':'Equipamento'} instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
+        ${sel.motorInstaladoId?(()=>{ const m=DB.ativosRG.find(r=>r.id===sel.motorInstaladoId); return m?`<div class="note" style="color:var(--info-text);margin-bottom:8px">⚙️ ${m.tipo==='Motor'?'Motor':'Equipamento'} instalado: <b>${m.numeroRG}</b> (${m.nome}) — troque em Mais → Sala de Motores</div>`:''; })():''}
         <div class="row-2">
           <button class="btn btn-ghost btn-sm editAtivo" data-id="${sel.id}">Editar</button>
           <button class="btn btn-ghost btn-sm addFilhoAtivo" data-id="${sel.id}">+ Adicionar filho</button>
@@ -1292,7 +1323,7 @@ function ativoFormSheet(){
     <label>Ativo pai (opcional — deixe em branco se for um ativo raiz/independente)</label>
     <select id="aAtivoPai"><option value="">Nenhum — ativo independente</option>${opcoesPai.map(p=>`<option value="${p.id}" ${a.ativoPaiId===p.id?'selected':''}>${p.codigo} — ${p.nome}</option>`).join('')}<option value="${SALA_MOTORES}" ${a.ativoPaiId===SALA_MOTORES?'selected':''}>🏠 Sala de Motores (equipamento reserva)</option></select>
     <div class="note" id="salaMotoresNote" style="${a.ativoPaiId===SALA_MOTORES?'':'display:none'}color:var(--amber)">Ao salvar, isso vai virar um registro RG na Sala de Motores (equipamento reserva), não um ativo filho de verdade.</div>
-    <div class="note" id="rgVinculadoNote" style="display:none;color:#7FB4EE"></div>
+    <div class="note" id="rgVinculadoNote" style="display:none;color:var(--info-text)"></div>
     <div class="note">Use isso para ligar um motor, motobomba ou motoredutor a um equipamento maior (o "pai").</div>
 
     <label>Fabricante</label>
@@ -3322,6 +3353,10 @@ function maisView(){
       ${DB.config.loginLogoImage?`
       <label style="margin-top:10px">Tamanho da logo na tela de login: <b>${DB.config.loginLogoScale||100}%</b></label>
       <input type="range" id="loginLogoScaleRange" min="50" max="300" step="10" value="${DB.config.loginLogoScale||100}" style="width:100%">
+      <label style="margin-top:10px">Posição horizontal: <b>${DB.config.loginLogoOffsetX||0}px</b></label>
+      <input type="range" id="loginLogoOffsetXRange" min="-150" max="150" step="5" value="${DB.config.loginLogoOffsetX||0}" style="width:100%">
+      <label style="margin-top:10px">Posição vertical: <b>${DB.config.loginLogoOffsetY||0}px</b></label>
+      <input type="range" id="loginLogoOffsetYRange" min="-100" max="100" step="5" value="${DB.config.loginLogoOffsetY||0}" style="width:100%">
       <button class="btn btn-ghost btn-sm" id="removeLoginLogoBtn" style="margin-top:8px">Remover logo personalizada</button>`:''}
 
       <label style="margin-top:14px">Imagem de fundo</label>
@@ -3472,6 +3507,8 @@ function attachMaisEvents(){
   if(removeLoginLogoBtn) removeLoginLogoBtn.onclick = async ()=>{
     DB.config.loginLogoImage = '';
     DB.config.loginLogoScale = 100;
+    DB.config.loginLogoOffsetX = 0;
+    DB.config.loginLogoOffsetY = 0;
     await saveAll(KEYS.config, DB.config);
     toast('Logo personalizada removida — voltou ao padrão'); renderView();
   };
@@ -3479,6 +3516,20 @@ function attachMaisEvents(){
   const loginLogoScaleRange = document.getElementById('loginLogoScaleRange');
   if(loginLogoScaleRange) loginLogoScaleRange.onchange = async ()=>{
     DB.config.loginLogoScale = parseInt(loginLogoScaleRange.value, 10);
+    await saveAll(KEYS.config, DB.config);
+    renderView();
+  };
+
+  const loginLogoOffsetXRange = document.getElementById('loginLogoOffsetXRange');
+  if(loginLogoOffsetXRange) loginLogoOffsetXRange.onchange = async ()=>{
+    DB.config.loginLogoOffsetX = parseInt(loginLogoOffsetXRange.value, 10);
+    await saveAll(KEYS.config, DB.config);
+    renderView();
+  };
+
+  const loginLogoOffsetYRange = document.getElementById('loginLogoOffsetYRange');
+  if(loginLogoOffsetYRange) loginLogoOffsetYRange.onchange = async ()=>{
+    DB.config.loginLogoOffsetY = parseInt(loginLogoOffsetYRange.value, 10);
     await saveAll(KEYS.config, DB.config);
     renderView();
   };
