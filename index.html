@@ -578,20 +578,21 @@ function render(){
     const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
     const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
     const podeAtivos = usuarioTemAcessoModulo(uAtual, 'ativos');
+    const podePlanoLub = usuarioTemAcessoModulo(uAtual, 'planolub');
     if(!uAtual || !uAtual.master){
-      const permitidos = [podeMro&&'mro', podeLub&&'lub', podeAtivos&&'ativos'].filter(Boolean);
+      const permitidos = [podeMro&&'mro', podeLub&&'lub', podeAtivos&&'ativos', podePlanoLub&&'planolub'].filter(Boolean);
       if(permitidos.length===1){ moduloAtivo=permitidos[0]; resetModuleUiState(); }
     }
   }
   if(!moduloAtivo){ app.classList.remove('theme-light'); app.innerHTML = moduloSelectorScreen(); attachModuloSelectorEvents(); return; }
   const uAtualTop = DB.usuarios.find(x=>x.id===currentUser.id);
-  const modulosDoUsuario = uAtualTop && uAtualTop.master ? ['mro','lub','ativos'] : ['mro','lub','ativos'].filter(m=>usuarioTemAcessoModulo(uAtualTop, m));
+  const modulosDoUsuario = uAtualTop && uAtualTop.master ? ['mro','lub','ativos','planolub'] : ['mro','lub','ativos','planolub'].filter(m=>usuarioTemAcessoModulo(uAtualTop, m));
   const temMaisDeUmModulo = modulosDoUsuario.length > 1;
-  const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : (moduloAtivo==='ativos' ? 'Cadastro de Ativos' : 'Estoque MRO');
+  const rotulo = moduloAtivo==='lub' ? 'Sala de Lubrificantes' : (moduloAtivo==='ativos' ? 'Cadastro de Ativos' : (moduloAtivo==='planolub' ? 'Lubrificação' : 'Estoque MRO'));
   const rotuloProdutos = moduloAtivo==='lub' ? 'Lubri' : 'Produtos';
-  const navButtons = moduloAtivo==='ativos'
+  const navButtons = (moduloAtivo==='ativos' || moduloAtivo==='planolub')
     ? `<button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
-       <button data-v="produtos"><span>${ICONS.box}</span>Ativos</button>
+       <button data-v="produtos"><span>${ICONS.box}</span>${moduloAtivo==='planolub'?'Módulos':'Ativos'}</button>
        <button data-v="mais"><span>${ICONS.more}</span>Mais</button>`
     : `<button data-v="dashboard"><span>${ICONS.home}</span>Início</button>
        <button data-v="produtos"><span>${ICONS.box}</span>${rotuloProdutos}</button>
@@ -632,6 +633,7 @@ function moduloSelectorScreen(){
   const podeMro = usuarioTemAcessoModulo(uAtual, 'mro');
   const podeLub = usuarioTemAcessoModulo(uAtual, 'lub');
   const podeAtivos = usuarioTemAcessoModulo(uAtual, 'ativos');
+  const podePlanoLub = usuarioTemAcessoModulo(uAtual, 'planolub');
   const alertasMro = DB.produtos.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
   return `
@@ -659,7 +661,12 @@ function moduloSelectorScreen(){
         <div><div class="desc" style="font-size:17px">⚙️ Cadastro de Ativos</div><div class="note">Máquinas, motores, redutores, bombas, esteiras</div></div>
       </div>
     </div>`:''}
-    ${(!podeMro && !podeLub && !podeAtivos)?`<div class="note" style="color:var(--brick)">Seu acesso não está liberado para nenhum módulo. Fale com o administrador master.</div>`:''}
+    ${podePlanoLub?`<div class="card modSelCard" data-mod="planolub" style="cursor:pointer;background:var(--panel);border:1.5px solid rgba(255,255,255,.22)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="desc" style="font-size:17px">🛠️ Lubrificação</div><div class="note">Plano preventivo, rotas e execução de lubrificação</div></div>
+      </div>
+    </div>`:''}
+    ${(!podeMro && !podeLub && !podeAtivos && !podePlanoLub)?`<div class="note" style="color:var(--brick)">Seu acesso não está liberado para nenhum módulo. Fale com o administrador master.</div>`:''}
 
     <button class="forgot-link" id="sairModuloBtn" style="margin-top:18px">Sair</button>
   </div></div>`;
@@ -676,6 +683,7 @@ function resetModuleUiState(){
   showEquipForm=false; editingEquip=null; equipFormDraft=null;
   motorConsertoEnvioId=null; motorConsertoRetornoId=null; motorHistoricoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
+  planoLubSecaoAtiva=null;
 }
 
 function attachModuloSelectorEvents(){
@@ -692,6 +700,13 @@ function renderView(){
     if(currentView==='dashboard') { el.innerHTML = ativosDashboardView(); attachAtivosDashboardEvents(); attachCommonEvents(); return; }
     else if(currentView==='produtos') { el.innerHTML = ativosListView(); attachAtivosEvents(); return; }
     else if(currentView==='mais') { el.innerHTML = ativosMaisView(); attachAtivosMaisEvents(); attachCommonEvents(); return; }
+    attachCommonEvents();
+    return;
+  }
+  if(moduloAtivo==='planolub'){
+    if(currentView==='dashboard') { el.innerHTML = planoLubDashboardView(); attachCommonEvents(); return; }
+    else if(currentView==='produtos') { el.innerHTML = planoLubModulosView(); attachPlanoLubModulosEvents(); return; }
+    else if(currentView==='mais') { el.innerHTML = planoLubMaisView(); attachPlanoLubMaisEvents(); attachCommonEvents(); return; }
     attachCommonEvents();
     return;
   }
@@ -839,6 +854,71 @@ function ativoCompletudePct(a){
   const total = CAMPOS_COMPLETUDE_ATIVO.length + especificos.length;
   return total>0 ? Math.round((preenchidos/total)*100) : 0;
 }
+
+/* ============ LUBRIFICAÇÃO — PLANO PREVENTIVO (módulo em construção, Fase 1: estrutura) ============ */
+const SECOES_PLANOLUB = [
+  {id:'equipamentos', icone:'⚙️', nome:'Equipamentos', desc:'Reaproveita o Cadastro de Ativos — nenhum cadastro duplicado'},
+  {id:'pontos', icone:'📍', nome:'Pontos de Lubrificação', desc:'Mapa visual interativo sobre a foto do equipamento'},
+  {id:'procedimentos', icone:'📋', nome:'Procedimentos', desc:'Biblioteca reutilizável de procedimentos de lubrificação'},
+  {id:'checklists', icone:'✅', nome:'Checklists', desc:'Biblioteca reutilizável de checklists'},
+  {id:'planos', icone:'🧭', nome:'Planos', desc:'Assistente guiado: equipamento → pontos → procedimento → checklist → lubrificante → frequência'},
+  {id:'rotas', icone:'🗺️', nome:'Rotas', desc:'Agrupamento de pontos por equipamento, setor, área, frequência ou criticidade'},
+  {id:'execucao', icone:'▶️', nome:'Execução', desc:'Modo Campo — fluxo ponto a ponto otimizado para celular/tablet'},
+  {id:'historico', icone:'🗂️', nome:'Histórico', desc:'Todo evento executado gera um novo registro (nunca substitui)'},
+  {id:'indicadores', icone:'📊', nome:'Indicadores', desc:'Rotas executadas/pendentes/atrasadas, consumo, tempo médio, custos'}
+];
+let planoLubSecaoAtiva = null;
+
+function planoLubDashboardView(){
+  let html = `<h2 class="section-title">Painel — Lubrificação</h2>`;
+  html += `<div class="metrics">
+    <div class="metric"><div class="val">0</div><div class="lbl">Rotas executadas</div></div>
+    <div class="metric amber"><div class="val">0</div><div class="lbl">Rotas pendentes</div></div>
+    <div class="metric" style="background:var(--brick)"><div class="val">0</div><div class="lbl">Rotas atrasadas</div></div>
+    <div class="metric" style="background:var(--moss)"><div class="val">0</div><div class="lbl">Lubrificações hoje</div></div>
+  </div>`;
+  html += `<div class="card" style="border-color:var(--steel)">
+    <div class="row1"><b>🚧 Módulo em construção — Fase 1</b></div>
+    <div class="note" style="margin-top:6px">Esta é a estrutura inicial do módulo de Lubrificação (plano preventivo). Os indicadores acima e as seções em "Módulos" vão ganhar funcionalidade nas próximas fases, uma de cada vez.</div>
+  </div>`;
+  html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Próximas lubrificações</h2>
+  <div class="empty"><div class="icon">🛠️</div>Ainda não há planos cadastrados.</div>`;
+  return html;
+}
+
+function planoLubModulosView(){
+  let html = `<h2 class="section-title">Módulos de Lubrificação</h2>`;
+  html += `<div class="note" style="margin-bottom:12px">Estrutura da Fase 1 — cada seção será desenvolvida em etapas, uma por vez.</div>`;
+  SECOES_PLANOLUB.forEach(s=>{
+    html += `<div class="card planoLubSecaoCard" data-id="${s.id}" style="cursor:pointer">
+      <div class="row1" style="align-items:center">
+        <div class="desc" style="font-size:15px">${s.icone} ${s.nome}</div>
+        <span class="pill B">em breve</span>
+      </div>
+      <div class="note" style="margin-top:4px">${s.desc}</div>
+    </div>`;
+  });
+  return html;
+}
+
+function attachPlanoLubModulosEvents(){
+  document.querySelectorAll('.planoLubSecaoCard').forEach(c=>{
+    c.onclick = ()=>{
+      const s = SECOES_PLANOLUB.find(x=>x.id===c.dataset.id);
+      toast(`"${s.nome}" ainda será desenvolvido — combinamos de ir por fases 🙂`);
+    };
+  });
+}
+
+function planoLubMaisView(){
+  let html = `<h2 class="section-title">Configurações — Lubrificação</h2>`;
+  html += `<div class="card">
+    <div class="note">Configurações específicas do módulo de Lubrificação (frequências padrão, notificações de atraso, etc.) entram numa fase mais adiante do desenvolvimento.</div>
+  </div>`;
+  return html;
+}
+
+function attachPlanoLubMaisEvents(){}
 
 function ativosDashboardView(){
   const ativos = DB.ativos.filter(a=>a.ativo!==false);
@@ -3357,6 +3437,7 @@ function maisView(){
       <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModMro" checked> Estoque MRO</label>
       <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModLub"> Sala de Lubrificantes</label>
       <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModAtivos"> Cadastro de Ativos</label>
+      <label class="remember" style="color:var(--ink)"><input type="checkbox" id="uModPlanoLub"> Lubrificação (plano preventivo)</label>
       <button class="btn btn-primary btn-sm" id="addUserBtn">Adicionar usuário</button>
       <div class="note">Só existe um acesso master de verdade (dono das senhas). ADM tem quase tudo igual, mas não vê nem mexe em login/senha de ninguém. Marque pelo menos um módulo.</div>
     </div>`;
@@ -3437,7 +3518,8 @@ function maisView(){
         <label>Módulos liberados</label>
         <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModMro" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'mro')?'checked':''}> Estoque MRO</label>
         <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModLub" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'lub')?'checked':''}> Sala de Lubrificantes</label>
-        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModAtivos" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'ativos')?'checked':''}> Cadastro de Ativos</label>`:''}
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModAtivos" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'ativos')?'checked':''}> Cadastro de Ativos</label>
+        <label class="remember" style="color:var(--ink)"><input type="checkbox" class="credModPlanoLub" data-id="${u.id}" ${usuarioTemAcessoModulo(u,'planolub')?'checked':''}> Lubrificação (plano preventivo)</label>`:''}
         <div class="row-2">
           <button class="btn btn-primary btn-sm saveCred" data-id="${u.id}">Salvar</button>
           <button class="btn btn-ghost btn-sm genQrCred" data-id="${u.id}">Gerar QR</button>
@@ -3503,6 +3585,7 @@ function attachMaisEvents(){
     if(document.getElementById('uModMro').checked) modulos.push('mro');
     if(document.getElementById('uModLub').checked) modulos.push('lub');
     if(document.getElementById('uModAtivos').checked) modulos.push('ativos');
+    if(document.getElementById('uModPlanoLub').checked) modulos.push('planolub');
     if(!nome || !login || !senha){ toast('Preencha nome, login e senha'); return; }
     if(modulos.length===0){ toast('Marque pelo menos um módulo (MRO ou Lubrificantes)'); return; }
     if(DB.usuarios.some(x=>x.login===login)){ toast('Já existe um usuário com esse login'); return; }
@@ -3650,11 +3733,13 @@ function attachMaisEvents(){
         const modMroField = document.querySelector(`.credModMro[data-id="${id}"]`);
         const modLubField = document.querySelector(`.credModLub[data-id="${id}"]`);
         const modAtivosField = document.querySelector(`.credModAtivos[data-id="${id}"]`);
+        const modPlanoLubField = document.querySelector(`.credModPlanoLub[data-id="${id}"]`);
         if(modMroField && modLubField){
           const modulos = [];
           if(modMroField.checked) modulos.push('mro');
           if(modLubField.checked) modulos.push('lub');
           if(modAtivosField && modAtivosField.checked) modulos.push('ativos');
+          if(modPlanoLubField && modPlanoLubField.checked) modulos.push('planolub');
           if(modulos.length===0){ toast('Marque pelo menos um módulo para este usuário'); return; }
           u.modulos = modulos;
         }
