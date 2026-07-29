@@ -142,6 +142,25 @@
   .search input{flex:1;}
   .tabs-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 
+  /* Kit de componentes — Fase 2 (módulo Lubrificação) */
+  .pl-table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:10px;}
+  .pl-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .pl-table th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);padding:9px 10px;border-bottom:1px solid var(--line);background:var(--paper-2);}
+  .pl-table td{padding:9px 10px;border-bottom:1px solid var(--line);}
+  .pl-table tr:last-child td{border-bottom:none;}
+  .pl-menu-wrap{position:relative;display:inline-block;}
+  .pl-menu-drop{position:absolute;right:0;top:100%;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:50;overflow:hidden;}
+  .pl-menu-item{display:block;width:100%;text-align:left;background:none;border:none;padding:10px 12px;font-size:13px;color:var(--ink);cursor:pointer;}
+  .pl-menu-item:hover{background:var(--paper-2);}
+  .pl-menu-item.danger{color:var(--brick);}
+  @media (max-width:480px){
+    .pl-table thead{display:none;}
+    .pl-table, .pl-table tbody, .pl-table tr, .pl-table td{display:block;width:100%;}
+    .pl-table tr{border-bottom:1px solid var(--line);padding:8px 10px;}
+    .pl-table td{border:none;padding:3px 0;display:flex;justify-content:space-between;gap:10px;font-size:12.5px;}
+    .pl-table td::before{content:attr(data-label);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;color:var(--muted);}
+  }
+
   /* Lista compacta de Ativos */
   .ativo-row{display:flex;align-items:center;gap:9px;padding:10px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;color:var(--ink);}
   .ativo-row:hover{background:var(--paper-2);}
@@ -683,7 +702,7 @@ function resetModuleUiState(){
   showEquipForm=false; editingEquip=null; equipFormDraft=null;
   motorConsertoEnvioId=null; motorConsertoRetornoId=null; motorHistoricoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
-  planoLubSecaoAtiva=null;
+  planoLubSecaoAtiva=null; planoLubBusca=''; planoLubEquipBusca='';
 }
 
 function attachModuloSelectorEvents(){
@@ -704,7 +723,7 @@ function renderView(){
     return;
   }
   if(moduloAtivo==='planolub'){
-    if(currentView==='dashboard') { el.innerHTML = planoLubDashboardView(); attachCommonEvents(); return; }
+    if(currentView==='dashboard') { el.innerHTML = planoLubDashboardView(); attachPlanoLubDashboardEvents(); attachCommonEvents(); return; }
     else if(currentView==='produtos') { el.innerHTML = planoLubModulosView(); attachPlanoLubModulosEvents(); return; }
     else if(currentView==='mais') { el.innerHTML = planoLubMaisView(); attachPlanoLubMaisEvents(); attachCommonEvents(); return; }
     attachCommonEvents();
@@ -869,43 +888,284 @@ const SECOES_PLANOLUB = [
 ];
 let planoLubSecaoAtiva = null;
 
-function planoLubDashboardView(){
-  let html = `<h2 class="section-title">Painel — Lubrificação</h2>`;
-  html += `<div class="metrics">
-    <div class="metric"><div class="val">0</div><div class="lbl">Rotas executadas</div></div>
-    <div class="metric amber"><div class="val">0</div><div class="lbl">Rotas pendentes</div></div>
-    <div class="metric" style="background:var(--brick)"><div class="val">0</div><div class="lbl">Rotas atrasadas</div></div>
-    <div class="metric" style="background:var(--moss)"><div class="val">0</div><div class="lbl">Lubrificações hoje</div></div>
+/* ============ FASE 2 — KIT DE COMPONENTES REUTILIZÁVEIS (plX) ============
+   Toda tela nova do módulo Lubrificação (Equipamentos, Pontos, Procedimentos,
+   Checklists, Planos, Rotas, Execução, Histórico, Indicadores) deve montar
+   sua interface usando essas funções, para manter visual e comportamento
+   100% consistentes sem reescrever HTML do zero em cada fase. */
+
+// Badge de status colorido. tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral'
+function plBadge(texto, tone){
+  const cls = {ok:'A', warn:'B', danger:'C', info:'', neutral:''}[tone] || '';
+  const estiloExtra = tone==='info' ? 'background:rgba(62,142,224,.15);color:#7FB4EE;' : (tone==='neutral' ? 'background:var(--paper-2);color:var(--muted);' : '');
+  return `<span class="pill ${cls}" style="${estiloExtra}">${texto}</span>`;
+}
+
+// Cabeçalho de seção com título + ações opcionais à direita (botões, badge de contagem)
+function plSectionHeader(titulo, acoesHtml){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 class="section-title" style="margin:0">${titulo}</h2>
+    ${acoesHtml?`<div style="display:flex;gap:8px;align-items:center">${acoesHtml}</div>`:''}
   </div>`;
-  html += `<div class="card" style="border-color:var(--steel)">
-    <div class="row1"><b>🚧 Módulo em construção — Fase 1</b></div>
-    <div class="note" style="margin-top:6px">Esta é a estrutura inicial do módulo de Lubrificação (plano preventivo). Os indicadores acima e as seções em "Módulos" vão ganhar funcionalidade nas próximas fases, uma de cada vez.</div>
-  </div>`;
-  html += `<h2 class="section-title" style="font-size:16px;margin-top:16px">Próximas lubrificações</h2>
-  <div class="empty"><div class="icon">🛠️</div>Ainda não há planos cadastrados.</div>`;
+}
+
+// Card padrão — conteúdo livre dentro de um .card, com borda opcional colorida (ex: 'var(--steel)')
+function plCard(innerHtml, corBorda){
+  return `<div class="card"${corBorda?` style="border-color:${corBorda}"`:''}>${innerHtml}</div>`;
+}
+
+// Estado vazio padrão (ícone + texto), usado sempre que uma lista não tem itens
+function plEmpty(icone, texto){
+  return `<div class="empty"><div class="icon">${icone}</div>${texto}</div>`;
+}
+
+// Ladrilho de métrica (número grande + rótulo), tone controla a cor de fundo
+function plMetricTile(valor, rotulo, tone){
+  const bg = {amber:'style="background:var(--amber-dark)"', danger:'style="background:var(--brick)"', ok:'style="background:var(--moss)"'}[tone] || '';
+  return `<div class="metric" ${bg}><div class="val">${valor}</div><div class="lbl">${rotulo}</div></div>`;
+}
+function plMetricsRow(itens){
+  return `<div class="metrics">${itens.map(i=>plMetricTile(i.valor, i.rotulo, i.tone)).join('')}</div>`;
+}
+
+// Tabela simples responsiva (empilha em telas estreitas via CSS .pl-table)
+function plTable(colunas, linhas){
+  if(linhas.length===0) return plEmpty('📄','Nenhum registro encontrado.');
+  let html = `<div class="pl-table-wrap"><table class="pl-table">
+    <thead><tr>${colunas.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+    <tbody>`;
+  linhas.forEach(linha=>{
+    html += `<tr>${linha.map((cel,i)=>`<td data-label="${colunas[i]||''}">${cel}</td>`).join('')}</tr>`;
+  });
+  html += `</tbody></table></div>`;
   return html;
 }
 
+// Grupo de campo de formulário padronizado (label + input/select/textarea já pronto)
+function plFormGroup(labelTexto, inputHtml, notaTexto){
+  return `<label>${labelTexto}</label>${inputHtml}${notaTexto?`<div class="note">${notaTexto}</div>`:''}`;
+}
+
+// Botão padrão do kit. variant: 'primary' | 'outline' | 'ghost' | 'danger' | 'amber'
+function plButton(texto, id, variant, extra){
+  const cls = {primary:'btn-primary', outline:'btn-outline', ghost:'btn-ghost', danger:'btn-danger', amber:'btn-amber'}[variant] || 'btn-ghost';
+  return `<button class="btn ${cls} btn-sm ${extra&&extra.classe?extra.classe:''}" id="${id||''}" style="width:auto;margin:0;padding:8px 14px">${texto}</button>`;
+}
+
+// Menu de ações "..." — lista de {texto, classe} que viram botões dentro de um dropdown simples
+function plMenu(menuId, itens){
+  return `<div class="pl-menu-wrap">
+    <button class="btn btn-ghost btn-sm plMenuToggle" data-menu="${menuId}" style="width:auto;margin:0;padding:6px 10px">⋯</button>
+    <div class="pl-menu-drop hidden" id="menu-${menuId}">
+      ${itens.map(i=>`<button class="pl-menu-item ${i.classe||''}" data-action="${i.acao}">${i.texto}</button>`).join('')}
+    </div>
+  </div>`;
+}
+function attachPlMenuEvents(onAction){
+  document.querySelectorAll('.plMenuToggle').forEach(b=>{
+    b.onclick = (e)=>{
+      e.stopPropagation();
+      const drop = document.getElementById('menu-'+b.dataset.menu);
+      document.querySelectorAll('.pl-menu-drop').forEach(d=>{ if(d!==drop) d.classList.add('hidden'); });
+      if(drop) drop.classList.toggle('hidden');
+    };
+  });
+  document.querySelectorAll('.pl-menu-item').forEach(b=>{
+    b.onclick = (e)=>{ e.stopPropagation(); document.querySelectorAll('.pl-menu-drop').forEach(d=>d.classList.add('hidden')); if(onAction) onAction(b.dataset.action, b); };
+  });
+  document.addEventListener('click', ()=>{ document.querySelectorAll('.pl-menu-drop').forEach(d=>d.classList.add('hidden')); }, {once:true});
+}
+
+// Modal/ficha padrão reaproveitando .overlay/.sheet já existentes no app
+function plModal(id, titulo, bodyHtml){
+  return `<div class="overlay" id="${id}"><div class="sheet">
+    <div class="sheet-head"><h2 class="section-title" style="margin:0">${titulo}</h2><button class="close plModalClose" data-modal="${id}">×</button></div>
+    ${bodyHtml}
+  </div></div>`;
+}
+
+let planoLubBusca = '';
+
+function planoLubDashboardView(){
+  const equipamentos = DB.ativos.filter(a=>a.ativo!==false);
+  const equipCriticos = equipamentos.filter(a=>a.criticidade==='A');
+  const agora = new Date();
+  const retiradasLubMes = DB.retiradasLub.filter(r=>{
+    const d = new Date(r.dataHora);
+    return d.getMonth()===agora.getMonth() && d.getFullYear()===agora.getFullYear();
+  });
+  function consumoPorTipos(tipos){
+    let total = 0;
+    retiradasLubMes.forEach(r=>{
+      const p = DB.produtosLub.find(x=>x.id===r.produtoId);
+      if(p && tipos.includes(p.tipoLubrificante)) total += (r.quantidadeRetirada||0);
+    });
+    return Math.round(total*100)/100;
+  }
+  const consumoOleo = consumoPorTipos(['Óleo','Óleo Spray']);
+  const consumoGraxa = consumoPorTipos(['Graxa','Graxa Spray']);
+  const alertasLub = DB.produtosLub.filter(p=>p.ativo!==false && (p.quantidade||0)<=(p.estoqueMinimo||0)).length;
+
+  let html = plSectionHeader('Painel — Lubrificação', plBadge('Fase 3 — dashboard', 'info'));
+
+  html += `<input id="plBuscaGlobal" placeholder="🔎 Pesquisa global — equipamento, motor..." value="${planoLubBusca}" style="margin-bottom:14px">`;
+  if(planoLubBusca.trim()){
+    const termo = planoLubBusca.toLowerCase();
+    const eqs = DB.ativos.filter(a=>a.ativo!==false && ((a.nome||'').toLowerCase().includes(termo) || (a.codigo||'').toLowerCase().includes(termo)));
+    const mots = DB.motoresRG.filter(m=>m.ativo!==false && (m.numeroRG.toLowerCase().includes(termo) || (m.fabricante||'').toLowerCase().includes(termo) || (m.modelo||'').toLowerCase().includes(termo)));
+    const linhas = [
+      ...eqs.map(a=>['Equipamento', a.codigo, a.nome]),
+      ...mots.map(m=>['Motor', m.numeroRG, `${m.fabricante||''} ${m.modelo||''}`.trim()||'—'])
+    ];
+    html += plTable(['Tipo','Código','Nome'], linhas);
+  }
+
+  html += plSectionHeader('Equipamentos e Rotas');
+  html += plMetricsRow([
+    {valor:equipamentos.length, rotulo:'Equipamentos cadastrados'},
+    {valor:0, rotulo:'Pontos de lubrificação'},
+    {valor:0, rotulo:'Rotas cadastradas'},
+    {valor:equipCriticos.length, rotulo:'Equipamentos críticos', tone: equipCriticos.length>0?'danger':undefined}
+  ]);
+
+  html += plSectionHeader('Execução');
+  html += plMetricsRow([
+    {valor:0, rotulo:'Rotas executadas'},
+    {valor:0, rotulo:'Rotas pendentes', tone:'amber'},
+    {valor:0, rotulo:'Rotas atrasadas', tone:'danger'},
+    {valor:0, rotulo:'Lubrificações hoje', tone:'ok'}
+  ]);
+
+  html += plSectionHeader('Consumo do mês', plBadge(agora.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}),'neutral'));
+  html += plMetricsRow([
+    {valor:consumoOleo, rotulo:'Óleo retirado (L)'},
+    {valor:consumoGraxa, rotulo:'Graxa retirada (kg)'}
+  ]);
+  const porTipo = ['Graxa','Graxa Spray','Óleo','Óleo Spray'].map(t=>({nome:t, valor:consumoPorTipos([t]), unidade:''})).filter(i=>i.valor>0);
+  html += plCard(porTipo.length>0 ? renderBarChart(porTipo) : `<div class="note">Nenhuma retirada de lubrificante registrada este mês.</div>`);
+
+  if(alertasLub>0){
+    html += plCard(`<b>⚠️ ${alertasLub} lubrificante${alertasLub>1?'s':''} em ponto de recompra</b><div class="note" style="margin-top:4px">Veja detalhes em Sala de Lubrificantes → Alertas de Recompra.</div>`, 'var(--brick)');
+  }
+
+  html += plSectionHeader('Equipamentos críticos (criticidade A)', plBadge(equipCriticos.length+' itens','neutral'));
+  html += equipCriticos.length>0
+    ? plTable(['Código','Nome','Localização'], equipCriticos.slice(0,10).map(a=>[a.codigo, a.nome, a.localizacao||'—']))
+    : plEmpty('✅','Nenhum equipamento marcado como criticidade A no momento.');
+
+  html += plSectionHeader('Próximas lubrificações', plBadge('chega nas próximas fases','neutral'));
+  html += plEmpty('🧭','Ainda não há planos nem rotas cadastrados — isso entra nas Fases 9 e 10.');
+
+  return html;
+}
+
+function attachPlanoLubDashboardEvents(){
+  const busca = document.getElementById('plBuscaGlobal');
+  if(busca) busca.oninput = ()=>{
+    planoLubBusca = busca.value; renderView();
+    const el = document.getElementById('plBuscaGlobal');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+}
+
 function planoLubModulosView(){
-  let html = `<h2 class="section-title">Módulos de Lubrificação</h2>`;
-  html += `<div class="note" style="margin-bottom:12px">Estrutura da Fase 1 — cada seção será desenvolvida em etapas, uma por vez.</div>`;
+  if(planoLubSecaoAtiva==='equipamentos') return planoLubEquipamentosView();
+  if(planoLubSecaoAtiva){
+    const s = SECOES_PLANOLUB.find(x=>x.id===planoLubSecaoAtiva);
+    let html = plSectionHeader(`${s.icone} ${s.nome}`, plButton('← Voltar','voltarSecaoBtn','ghost'));
+    html += plEmpty('🚧', `"${s.nome}" ainda não foi desenvolvido. ${s.desc}`);
+    return html;
+  }
+  let html = plSectionHeader('Módulos de Lubrificação', plBadge('Fase 4', 'info'));
+  html += `<div class="note" style="margin-bottom:12px">Cada seção abaixo será desenvolvida em etapas. O menu "⋯" de cada card já usa o componente de menu de ações do kit.</div>`;
   SECOES_PLANOLUB.forEach(s=>{
-    html += `<div class="card planoLubSecaoCard" data-id="${s.id}" style="cursor:pointer">
+    html += plCard(`
       <div class="row1" style="align-items:center">
-        <div class="desc" style="font-size:15px">${s.icone} ${s.nome}</div>
-        <span class="pill B">em breve</span>
+        <div class="desc" style="font-size:15px;cursor:pointer" data-id="${s.id}">${s.icone} ${s.nome}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${plBadge(s.id==='equipamentos'?'pronto':'em breve', s.id==='equipamentos'?'ok':'warn')}
+          ${plMenu('sec-'+s.id, [{acao:'abrir',texto:'Abrir seção'},{acao:'info',texto:'Sobre esta seção'}])}
+        </div>
       </div>
       <div class="note" style="margin-top:4px">${s.desc}</div>
-    </div>`;
+    `);
   });
   return html;
 }
 
 function attachPlanoLubModulosEvents(){
-  document.querySelectorAll('.planoLubSecaoCard').forEach(c=>{
-    c.onclick = ()=>{
-      const s = SECOES_PLANOLUB.find(x=>x.id===c.dataset.id);
-      toast(`"${s.nome}" ainda será desenvolvido — combinamos de ir por fases 🙂`);
+  if(planoLubSecaoAtiva==='equipamentos'){ attachPlanoLubEquipamentosEvents(); return; }
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  document.querySelectorAll('[data-id]').forEach(el=>{
+    if(!SECOES_PLANOLUB.some(s=>s.id===el.dataset.id)) return;
+    el.onclick = ()=>{ planoLubSecaoAtiva=el.dataset.id; renderView(); };
+  });
+  attachPlMenuEvents((acao, btn)=>{
+    const menuId = btn.closest('.pl-menu-drop').id.replace('menu-sec-','');
+    const s = SECOES_PLANOLUB.find(x=>x.id===menuId);
+    if(!s) return;
+    if(acao==='abrir'){ planoLubSecaoAtiva=s.id; renderView(); }
+    else if(acao==='info') toast(s.desc);
+  });
+}
+
+/* ---- Fase 4: Equipamentos — ponte de consulta com o Cadastro de Ativos (sem duplicar cadastro) ---- */
+let planoLubEquipBusca = '';
+
+function planoLubEquipamentosView(){
+  const isAdmin = isAdminLevel();
+  const termo = planoLubEquipBusca.toLowerCase();
+  const lista = DB.ativos.filter(a=>a.ativo!==false && ((a.nome||'').toLowerCase().includes(termo) || (a.codigo||'').toLowerCase().includes(termo)));
+
+  let html = plSectionHeader('⚙️ Equipamentos', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Esta lista vem direto do <b>Cadastro de Ativos</b> — nenhum cadastro é duplicado aqui. Os pontos de lubrificação de cada equipamento entram na próxima fase.</div>`;
+  html += `<input id="plEquipBuscaInput" placeholder="Buscar equipamento por código ou nome" value="${planoLubEquipBusca}" style="margin-bottom:12px">`;
+
+  if(lista.length===0){ html += plEmpty('⚙️','Nenhum equipamento encontrado. Cadastre em Cadastro de Ativos.'); return html; }
+
+  lista.forEach(a=>{
+    const qtdPontos = (a.pontosLubrificacao||[]).length;
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:9px">
+          ${a.foto?`<img src="${a.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+          <span class="codigo">${a.codigo}</span>
+        </div>
+        ${a.criticidade?plBadge(a.criticidade, a.criticidade==='A'?'danger':(a.criticidade==='B'?'warn':'ok')):''}
+      </div>
+      <div class="desc">${a.nome}</div>
+      <div class="meta"><span>${a.tipo||'—'}</span><span>${qtdPontos} ponto${qtdPontos!==1?'s':''} de lubrificação</span></div>
+      ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
+      ${isAdmin?`<div class="row-2" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm irParaAtivoBtn" data-id="${a.id}">Editar no Cadastro de Ativos</button>
+        <button class="btn btn-outline btn-sm" disabled title="Chega na Fase 5">+ Pontos de lubrificação</button>
+      </div>`:''}
+    `);
+  });
+  return html;
+}
+
+function attachPlanoLubEquipamentosEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('plEquipBuscaInput');
+  if(s) s.oninput = ()=>{
+    planoLubEquipBusca = s.value; renderView();
+    const el = document.getElementById('plEquipBuscaInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  document.querySelectorAll('.irParaAtivoBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const ativo = DB.ativos.find(a=>a.id===b.dataset.id);
+      moduloAtivo='ativos'; currentView='produtos';
+      ativosSubTab='cadastro'; ativosCadTipo='equipamento';
+      editingAtivo=ativo; ativoFormDraft=null; pendingFotoAtivoDataUrl=''; pendingFoto2AtivoDataUrl='';
+      showAtivoForm=true;
+      render();
     };
   });
 }
