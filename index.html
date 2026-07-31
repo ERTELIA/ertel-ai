@@ -153,6 +153,13 @@
   .pl-menu-item{display:block;width:100%;text-align:left;background:none;border:none;padding:10px 12px;font-size:13px;color:var(--ink);cursor:pointer;}
   .pl-menu-item:hover{background:var(--paper-2);}
   .pl-menu-item.danger{color:var(--brick);}
+  .pl-editor-toolbar{display:flex;flex-wrap:wrap;gap:6px;background:var(--paper-2);border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;padding:6px;}
+  .pl-editor-area{min-height:120px;max-height:280px;overflow-y:auto;background:var(--paper-2);border:1px solid var(--line);border-radius:0 0 8px 8px;padding:10px 12px;font-size:14px;color:var(--ink);}
+  .pl-editor-area:focus{outline:none;border-color:var(--steel);}
+  .pl-editor-area table{width:100%;border-collapse:collapse;margin:6px 0;}
+  .pl-editor-area table td{border:1px solid var(--line);padding:5px;}
+  .pl-editor-area a{color:#7FB4EE;}
+  .pl-editor-area ul, .pl-editor-area ol{padding-left:20px;}
   @media (max-width:480px){
     .pl-table thead{display:none;}
     .pl-table, .pl-table tbody, .pl-table tr, .pl-table td{display:block;width:100%;}
@@ -356,7 +363,7 @@ window.storage = {
 };
 
 /* ============ STORAGE HELPERS ============ */
-const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos', ativosRG:'ertel:ativosRG' };
+const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos', ativosRG:'ertel:ativosRG', procedimentos:'ertel:procedimentos' };
 
 let dbOffline = false;
 function showDbErrorBanner(msg){
@@ -399,7 +406,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[], procedimentos:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -420,6 +427,7 @@ async function bootstrap(){
   DB.retiradasLub = await loadAll(KEYS.retiradasLub, []);
   DB.ativos = await loadAll(KEYS.ativos, []);
   DB.ativosRG = await loadAll(KEYS.ativosRG, []);
+  DB.procedimentos = await loadAll(KEYS.procedimentos, []);
   if(!DB.usuarios.some(u=>u.master===true)){
     DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
@@ -702,7 +710,10 @@ function resetModuleUiState(){
   showEquipForm=false; editingEquip=null; equipFormDraft=null;
   motorConsertoEnvioId=null; motorConsertoRetornoId=null; motorHistoricoId=null;
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
-  planoLubSecaoAtiva=null; planoLubBusca=''; planoLubEquipBusca='';
+  planoLubSecaoAtiva=null; planoLubBusca=''; planoLubEquipBusca=''; planoLubLubBusca='';
+  procedimentoSearch=''; editingProcedimento=null; showProcedimentoForm=false; procedimentoFormDraft=null; pendingFotosProcedimento=[];
+  planoLubMapaAtivoId=null; planoLubModoAdicionar=false; planoLubModoVisualizacao=false; planoLubZoom=1;
+  planoLubPontoAtivo=null; showPontoForm=false; pontoFormDraft=null; pendingFotoPonto={geral:'',aproximada:'',detalhada:''};
 }
 
 function attachModuloSelectorEvents(){
@@ -877,6 +888,7 @@ function ativoCompletudePct(a){
 /* ============ LUBRIFICAÇÃO — PLANO PREVENTIVO (módulo em construção, Fase 1: estrutura) ============ */
 const SECOES_PLANOLUB = [
   {id:'equipamentos', icone:'⚙️', nome:'Equipamentos', desc:'Reaproveita o Cadastro de Ativos — nenhum cadastro duplicado'},
+  {id:'lubrificantes', icone:'🛢️', nome:'Lubrificantes', desc:'Reaproveita a Sala de Lubrificantes, enriquecida com dados técnicos'},
   {id:'pontos', icone:'📍', nome:'Pontos de Lubrificação', desc:'Mapa visual interativo sobre a foto do equipamento'},
   {id:'procedimentos', icone:'📋', nome:'Procedimentos', desc:'Biblioteca reutilizável de procedimentos de lubrificação'},
   {id:'checklists', icone:'✅', nome:'Checklists', desc:'Biblioteca reutilizável de checklists'},
@@ -1012,10 +1024,10 @@ function planoLubDashboardView(){
   if(planoLubBusca.trim()){
     const termo = planoLubBusca.toLowerCase();
     const eqs = DB.ativos.filter(a=>a.ativo!==false && ((a.nome||'').toLowerCase().includes(termo) || (a.codigo||'').toLowerCase().includes(termo)));
-    const mots = DB.motoresRG.filter(m=>m.ativo!==false && (m.numeroRG.toLowerCase().includes(termo) || (m.fabricante||'').toLowerCase().includes(termo) || (m.modelo||'').toLowerCase().includes(termo)));
+    const mots = DB.ativosRG.filter(m=>m.ativo!==false && ((m.numeroRG||'').toLowerCase().includes(termo) || (m.fabricante||'').toLowerCase().includes(termo) || (m.nome||m.modelo||'').toLowerCase().includes(termo)));
     const linhas = [
       ...eqs.map(a=>['Equipamento', a.codigo, a.nome]),
-      ...mots.map(m=>['Motor', m.numeroRG, `${m.fabricante||''} ${m.modelo||''}`.trim()||'—'])
+      ...mots.map(m=>[m.tipo||'Reserva', m.numeroRG, `${m.fabricante||''} ${m.nome||m.modelo||''}`.trim()||'—'])
     ];
     html += plTable(['Tipo','Código','Nome'], linhas);
   }
@@ -1070,6 +1082,9 @@ function attachPlanoLubDashboardEvents(){
 
 function planoLubModulosView(){
   if(planoLubSecaoAtiva==='equipamentos') return planoLubEquipamentosView();
+  if(planoLubSecaoAtiva==='mapaPontos') return planoLubMapaPontosView();
+  if(planoLubSecaoAtiva==='lubrificantes') return planoLubLubrificantesView();
+  if(planoLubSecaoAtiva==='procedimentos') return planoLubProcedimentosView();
   if(planoLubSecaoAtiva){
     const s = SECOES_PLANOLUB.find(x=>x.id===planoLubSecaoAtiva);
     let html = plSectionHeader(`${s.icone} ${s.nome}`, plButton('← Voltar','voltarSecaoBtn','ghost'));
@@ -1083,7 +1098,7 @@ function planoLubModulosView(){
       <div class="row1" style="align-items:center">
         <div class="desc" style="font-size:15px;cursor:pointer" data-id="${s.id}">${s.icone} ${s.nome}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          ${plBadge(s.id==='equipamentos'?'pronto':'em breve', s.id==='equipamentos'?'ok':'warn')}
+          ${plBadge(['equipamentos','lubrificantes','procedimentos'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos'].includes(s.id)?'ok':'warn')}
           ${plMenu('sec-'+s.id, [{acao:'abrir',texto:'Abrir seção'},{acao:'info',texto:'Sobre esta seção'}])}
         </div>
       </div>
@@ -1095,6 +1110,9 @@ function planoLubModulosView(){
 
 function attachPlanoLubModulosEvents(){
   if(planoLubSecaoAtiva==='equipamentos'){ attachPlanoLubEquipamentosEvents(); return; }
+  if(planoLubSecaoAtiva==='mapaPontos'){ attachPlanoLubMapaPontosEvents(); return; }
+  if(planoLubSecaoAtiva==='lubrificantes'){ attachPlanoLubLubrificantesEvents(); return; }
+  if(planoLubSecaoAtiva==='procedimentos'){ attachPlanoLubProcedimentosEvents(); return; }
   const voltarBtn = document.getElementById('voltarSecaoBtn');
   if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
 
@@ -1113,6 +1131,14 @@ function attachPlanoLubModulosEvents(){
 
 /* ---- Fase 4: Equipamentos — ponte de consulta com o Cadastro de Ativos (sem duplicar cadastro) ---- */
 let planoLubEquipBusca = '';
+let planoLubMapaAtivoId = null;
+let planoLubModoAdicionar = false;
+let planoLubModoVisualizacao = false;
+let planoLubZoom = 1;
+let planoLubPontoAtivo = null; // id do ponto sendo editado/visualizado
+let showPontoForm = false;
+let pontoFormDraft = null;
+let pendingFotoPonto = {geral:'', aproximada:'', detalhada:''};
 
 function planoLubEquipamentosView(){
   const isAdmin = isAdminLevel();
@@ -1140,12 +1166,307 @@ function planoLubEquipamentosView(){
       ${a.localizacao?`<div class="meta" style="margin-top:2px"><span>📍 ${a.localizacao}</span><span></span></div>`:''}
       ${isAdmin?`<div class="row-2" style="margin-top:8px">
         <button class="btn btn-ghost btn-sm irParaAtivoBtn" data-id="${a.id}">Editar no Cadastro de Ativos</button>
-        <button class="btn btn-outline btn-sm" disabled title="Chega na Fase 5">+ Pontos de lubrificação</button>
+        <button class="btn btn-outline btn-sm pontosLubBtn" data-id="${a.id}">📍 Pontos de lubrificação</button>
       </div>`:''}
     `);
   });
   return html;
 }
+
+/* ---- Fase 6: Lubrificantes — ponte de consulta com a Sala de Lubrificantes (sem duplicar cadastro) ---- */
+let planoLubLubBusca = '';
+
+function planoLubLubrificantesView(){
+  const isAdmin = isAdminLevel();
+  const termo = planoLubLubBusca.toLowerCase();
+  const lista = DB.produtosLub.filter(p=>p.ativo!==false && ((p.descricao||'').toLowerCase().includes(termo) || (p.codigo||'').toLowerCase().includes(termo) || (p.fabricante||'').toLowerCase().includes(termo)));
+
+  let html = plSectionHeader('🛢️ Lubrificantes', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Esta lista vem direto da <b>Sala de Lubrificantes</b>, já enriquecida com dados técnicos (ISO VG, NLGI, viscosidade, FISPQ etc.) — nenhum cadastro duplicado.</div>`;
+  html += `<input id="plLubBuscaInput" placeholder="Buscar por código, descrição ou fabricante" value="${planoLubLubBusca}" style="margin-bottom:12px">`;
+
+  if(lista.length===0){ html += plEmpty('🛢️','Nenhum lubrificante encontrado. Cadastre em Sala de Lubrificantes.'); return html; }
+
+  lista.forEach(p=>{
+    const temTecnico = p.isoVG || p.nlgi || p.viscosidade;
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:9px">
+          ${p.foto?`<img src="${p.foto}" style="width:34px;height:34px;object-fit:cover;border-radius:6px">`:''}
+          <span class="codigo">${p.codigo}</span>
+        </div>
+        ${p.tipoLubrificante?plBadge(p.tipoLubrificante,'info'):''}
+      </div>
+      <div class="desc">${p.descricao}</div>
+      <div class="meta"><span>${p.fabricante||'—'}</span><span>${p.quantidade} ${p.unidade}</span></div>
+      ${temTecnico?`<div class="note">${[p.isoVG,p.nlgi,p.viscosidade].filter(Boolean).join(' · ')}</div>`:''}
+      ${isAdmin?`<div class="row-2" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm irParaLubBtn" data-id="${p.id}">Editar na Sala de Lubrificantes</button>
+      </div>`:''}
+    `);
+  });
+  return html;
+}
+
+function attachPlanoLubLubrificantesEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('plLubBuscaInput');
+  if(s) s.oninput = ()=>{
+    planoLubLubBusca = s.value; renderView();
+    const el = document.getElementById('plLubBuscaInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  document.querySelectorAll('.irParaLubBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const produto = DB.produtosLub.find(p=>p.id===b.dataset.id);
+      moduloAtivo='lub'; currentView='produtos';
+      editingProduto=produto; pendingFotoDataUrl=''; showProdutoForm=true;
+      render();
+    };
+  });
+}
+
+/* ============ FASE 7 — BIBLIOTECA DE PROCEDIMENTOS ============ */
+let procedimentoSearch = '';
+let editingProcedimento = null;
+let showProcedimentoForm = false;
+let procedimentoFormDraft = null;
+let pendingFotosProcedimento = [];
+
+function proximoCodigoProcedimento(){
+  let maxNum = 0;
+  DB.procedimentos.forEach(pr=>{
+    const m = /^PROC-(\d+)$/.exec(pr.codigo||'');
+    if(m){ const n = parseInt(m[1],10); if(n>maxNum) maxNum = n; }
+  });
+  return 'PROC-' + String(maxNum+1).padStart(4,'0');
+}
+
+function planoLubProcedimentosView(){
+  const isAdmin = isAdminLevel();
+  const termo = procedimentoSearch.toLowerCase();
+  const lista = DB.procedimentos.filter(p=>p.ativo!==false && ((p.nome||'').toLowerCase().includes(termo) || (p.codigo||'').toLowerCase().includes(termo) || (p.categoria||'').toLowerCase().includes(termo)));
+
+  let html = plSectionHeader('📋 Procedimentos', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Biblioteca reutilizável — cada procedimento é cadastrado uma vez aqui e vinculado nos pontos de lubrificação e planos, sem precisar reescrever.</div>`;
+  html += `<div class="search"><input id="procSearchInput" placeholder="Buscar por código, nome ou categoria" value="${procedimentoSearch}">
+    ${isAdmin?plButton('+ Novo','newProcBtn','primary'):''}
+  </div>`;
+
+  if(lista.length===0){ html += plEmpty('📋','Nenhum procedimento cadastrado ainda.'); }
+  lista.forEach(pr=>{
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="codigo">${pr.codigo}</span>
+          ${plBadge('rev. '+(pr.revisao||1), 'neutral')}
+        </div>
+        ${isAdmin?plMenu('proc-'+pr.id, [{acao:'editar',texto:'Editar'},{acao:'historico',texto:'Histórico de revisões'},{acao:'excluir',texto:'Excluir',classe:'danger'}]):''}
+      </div>
+      <div class="desc">${pr.nome}</div>
+      <div class="meta"><span>${pr.categoria||'—'}</span><span>${pr.tempoPadrao?pr.tempoPadrao+' min':''}</span></div>
+      ${pr.objetivo?`<div class="note">${pr.objetivo}</div>`:''}
+    `);
+  });
+
+  if(showProcedimentoForm && isAdmin) html += procedimentoFormSheet();
+  return html;
+}
+
+function procedimentoFormSheet(){
+  if(!procedimentoFormDraft) procedimentoFormDraft = {
+    nome: editingProcedimento?.nome||'', categoria: editingProcedimento?.categoria||'', especialidade: editingProcedimento?.especialidade||'',
+    objetivo: editingProcedimento?.objetivo||'', descricaoHtml: editingProcedimento?.descricaoHtml||'', tempoPadrao: editingProcedimento?.tempoPadrao||'',
+    ferramentas: editingProcedimento?.ferramentas||'', epis: editingProcedimento?.epis||'', seguranca: editingProcedimento?.seguranca||'',
+    videoUrl: editingProcedimento?.videoUrl||'', pdfUrl: editingProcedimento?.pdfUrl||'', normas: editingProcedimento?.normas||'', observacoes: editingProcedimento?.observacoes||''
+  };
+  const p = procedimentoFormDraft;
+  const codigo = editingProcedimento ? editingProcedimento.codigo : proximoCodigoProcedimento();
+  const fotos = pendingFotosProcedimento.length>0 ? pendingFotosProcedimento : (editingProcedimento?.fotos||[]);
+
+  return plModal('procOverlay', `${editingProcedimento?'Editar':'Novo'} Procedimento — <span style="color:var(--amber)">${codigo}</span>`, `
+    ${plFormGroup('Nome', `<input id="prNome" value="${p.nome}" placeholder="Ex: Lubrificação de mancal">`)}
+    <div class="row-2">
+      <div>${plFormGroup('Categoria', `<input id="prCategoria" value="${p.categoria}" placeholder="Ex: Mecânica">`)}</div>
+      <div>${plFormGroup('Especialidade', `<input id="prEspecialidade" value="${p.especialidade}" placeholder="Ex: Lubrificação">`)}</div>
+    </div>
+    ${plFormGroup('Objetivo', `<input id="prObjetivo" value="${p.objetivo}" placeholder="Resumo de uma linha">`)}
+
+    <label>Descrição (editor de texto)</label>
+    <div class="pl-editor-toolbar">
+      <button type="button" class="btn btn-ghost btn-sm plEditCmd" data-cmd="bold" style="width:auto;margin:0;padding:5px 9px"><b>B</b></button>
+      <button type="button" class="btn btn-ghost btn-sm plEditCmd" data-cmd="italic" style="width:auto;margin:0;padding:5px 9px"><i>I</i></button>
+      <button type="button" class="btn btn-ghost btn-sm plEditCmd" data-cmd="underline" style="width:auto;margin:0;padding:5px 9px"><u>S</u></button>
+      <button type="button" class="btn btn-ghost btn-sm plEditCmd" data-cmd="insertUnorderedList" style="width:auto;margin:0;padding:5px 9px">• Lista</button>
+      <button type="button" class="btn btn-ghost btn-sm plEditCmd" data-cmd="insertOrderedList" style="width:auto;margin:0;padding:5px 9px">1. Lista</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="plEditTable" style="width:auto;margin:0;padding:5px 9px">▦ Tabela</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="plEditLink" style="width:auto;margin:0;padding:5px 9px">🔗 Link</button>
+    </div>
+    <div id="prDescricaoEditor" contenteditable="true" class="pl-editor-area">${p.descricaoHtml || '<p></p>'}</div>
+
+    <label style="margin-top:14px">Fotos</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      ${fotos.map((f,i)=>`<div style="position:relative"><img src="${f}" style="width:56px;height:56px;object-fit:cover;border-radius:6px"><button type="button" class="removeFotoProcBtn" data-idx="${i}" style="position:absolute;top:-6px;right:-6px;background:var(--brick);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">×</button></div>`).join('')}
+    </div>
+    <input type="file" accept="image/*" id="prAddFoto">
+
+    ${plFormGroup('Tempo padrão (minutos)', `<input id="prTempoPadrao" type="number" value="${p.tempoPadrao}">`)}
+    ${plFormGroup('Ferramentas', `<input id="prFerramentas" value="${p.ferramentas}" placeholder="Separadas por vírgula">`)}
+    ${plFormGroup('EPIs', `<input id="prEpis" value="${p.epis}" placeholder="Ex: Luva, óculos de proteção">`)}
+    ${plFormGroup('Segurança', `<textarea id="prSeguranca" rows="2" placeholder="Cuidados e riscos">${p.seguranca}</textarea>`)}
+    ${plFormGroup('Vídeo (link)', `<input id="prVideoUrl" value="${p.videoUrl}" placeholder="https://...">`)}
+    ${plFormGroup('PDF (link)', `<input id="prPdfUrl" value="${p.pdfUrl}" placeholder="https://...">`)}
+    ${plFormGroup('Normas', `<input id="prNormas" value="${p.normas}" placeholder="Ex: NR-12">`)}
+    ${plFormGroup('Observações', `<textarea id="prObservacoes" rows="2">${p.observacoes}</textarea>`)}
+    ${editingProcedimento?plFormGroup('Resumo da revisão (opcional)', `<input id="prResumoRevisao" placeholder="O que mudou nesta edição?">`, `Salvar vai criar a revisão ${(editingProcedimento.revisao||1)+1}.`):''}
+
+    ${plButton(editingProcedimento?'Salvar alterações':'Confirmar cadastro','saveProcBtn','primary')}
+    ${plButton('Cancelar','cancelProcBtn','ghost')}
+  `);
+}
+
+function attachPlanoLubProcedimentosEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('procSearchInput');
+  if(s) s.oninput = ()=>{
+    procedimentoSearch = s.value; renderView();
+    const el = document.getElementById('procSearchInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  const newBtn = document.getElementById('newProcBtn');
+  if(newBtn) newBtn.onclick = ()=>{ editingProcedimento=null; procedimentoFormDraft=null; pendingFotosProcedimento=[]; showProcedimentoForm=true; renderView(); };
+
+  attachPlMenuEvents((acao, btn)=>{
+    const id = btn.closest('.pl-menu-drop').id.replace('menu-proc-','');
+    const pr = DB.procedimentos.find(x=>x.id===id);
+    if(!pr) return;
+    if(acao==='editar'){ editingProcedimento=pr; procedimentoFormDraft=null; pendingFotosProcedimento=[]; showProcedimentoForm=true; renderView(); }
+    else if(acao==='excluir'){ excluirProcedimento(id); }
+    else if(acao==='historico'){ mostrarHistoricoRevisoes(pr); }
+  });
+
+  if(showProcedimentoForm) attachProcedimentoFormEvents();
+}
+
+function mostrarHistoricoRevisoes(pr){
+  const hist = pr.historicoRevisoes || [];
+  if(hist.length===0){ toast('Nenhuma revisão registrada além da criação.'); return; }
+  const linhas = hist.slice().reverse().map(h=>`Rev. ${h.revisao} — ${new Date(h.data).toLocaleDateString('pt-BR')}${h.resumo?': '+h.resumo:''}`).join('\n');
+  alert(`Histórico de revisões — ${pr.nome}\n\n${linhas}`);
+}
+
+function attachProcedimentoFormEvents(){
+  const closeX = document.querySelector('#procOverlay .plModalClose');
+  if(closeX) closeX.onclick = ()=>{ showProcedimentoForm=false; procedimentoFormDraft=null; editingProcedimento=null; renderView(); };
+  const cancelBtn = document.getElementById('cancelProcBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ showProcedimentoForm=false; procedimentoFormDraft=null; editingProcedimento=null; renderView(); };
+
+  document.querySelectorAll('.plEditCmd').forEach(b=>{
+    b.onclick = (e)=>{ e.preventDefault(); document.getElementById('prDescricaoEditor').focus(); document.execCommand(b.dataset.cmd, false, null); };
+  });
+  const tableBtn = document.getElementById('plEditTable');
+  if(tableBtn) tableBtn.onclick = (e)=>{
+    e.preventDefault();
+    const editor = document.getElementById('prDescricaoEditor');
+    editor.focus();
+    const tableHtml = '<table style="width:100%;border-collapse:collapse" border="1"><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr></table><p></p>';
+    document.execCommand('insertHTML', false, tableHtml);
+  };
+  const linkBtn = document.getElementById('plEditLink');
+  if(linkBtn) linkBtn.onclick = (e)=>{
+    e.preventDefault();
+    const url = prompt('Endereço do link:');
+    if(url){ document.getElementById('prDescricaoEditor').focus(); document.execCommand('createLink', false, url); }
+  };
+
+  const addFotoInput = document.getElementById('prAddFoto');
+  if(addFotoInput) addFotoInput.onchange = (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxSize=360; let w=img.width,h=img.height;
+        if(w>h && w>maxSize){h=h*(maxSize/w);w=maxSize;} else if(h>=w && h>maxSize){w=w*(maxSize/h);h=maxSize;}
+        const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        if(pendingFotosProcedimento.length===0 && editingProcedimento) pendingFotosProcedimento = [...(editingProcedimento.fotos||[])];
+        pendingFotosProcedimento.push(canvas.toDataURL('image/jpeg',0.7));
+        capturarDescricaoProcedimento();
+        renderView();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  document.querySelectorAll('.removeFotoProcBtn').forEach(b=>{
+    b.onclick = ()=>{
+      if(pendingFotosProcedimento.length===0 && editingProcedimento) pendingFotosProcedimento = [...(editingProcedimento.fotos||[])];
+      pendingFotosProcedimento.splice(parseInt(b.dataset.idx),1);
+      capturarDescricaoProcedimento();
+      renderView();
+    };
+  });
+
+  const saveBtn = document.getElementById('saveProcBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    capturarDescricaoProcedimento();
+    const nome = document.getElementById('prNome').value.trim();
+    if(!nome){ toast('Preencha o nome do procedimento'); return; }
+    procedimentoFormDraft.nome = nome;
+    procedimentoFormDraft.categoria = document.getElementById('prCategoria').value.trim();
+    procedimentoFormDraft.especialidade = document.getElementById('prEspecialidade').value.trim();
+    procedimentoFormDraft.objetivo = document.getElementById('prObjetivo').value.trim();
+    procedimentoFormDraft.descricaoHtml = document.getElementById('prDescricaoEditor').innerHTML;
+    procedimentoFormDraft.tempoPadrao = document.getElementById('prTempoPadrao').value;
+    procedimentoFormDraft.ferramentas = document.getElementById('prFerramentas').value.trim();
+    procedimentoFormDraft.epis = document.getElementById('prEpis').value.trim();
+    procedimentoFormDraft.seguranca = document.getElementById('prSeguranca').value.trim();
+    procedimentoFormDraft.videoUrl = document.getElementById('prVideoUrl').value.trim();
+    procedimentoFormDraft.pdfUrl = document.getElementById('prPdfUrl').value.trim();
+    procedimentoFormDraft.normas = document.getElementById('prNormas').value.trim();
+    procedimentoFormDraft.observacoes = document.getElementById('prObservacoes').value.trim();
+    const fotos = pendingFotosProcedimento.length>0 ? pendingFotosProcedimento : (editingProcedimento?.fotos||[]);
+
+    if(editingProcedimento){
+      const resumoField = document.getElementById('prResumoRevisao');
+      const resumo = resumoField ? resumoField.value.trim() : '';
+      Object.assign(editingProcedimento, procedimentoFormDraft, {fotos});
+      editingProcedimento.revisao = (editingProcedimento.revisao||1) + 1;
+      if(!editingProcedimento.historicoRevisoes) editingProcedimento.historicoRevisoes = [];
+      editingProcedimento.historicoRevisoes.push({revisao:editingProcedimento.revisao, data:new Date().toISOString(), resumo: resumo || 'Atualizado'});
+    } else {
+      DB.procedimentos.push({
+        id:uid(), codigo:proximoCodigoProcedimento(), ...procedimentoFormDraft, fotos,
+        revisao:1, historicoRevisoes:[{revisao:1, data:new Date().toISOString(), resumo:'Criação'}],
+        ativo:true, dataCadastro:new Date().toISOString()
+      });
+    }
+    await saveAll(KEYS.procedimentos, DB.procedimentos);
+    showProcedimentoForm=false; procedimentoFormDraft=null; editingProcedimento=null; pendingFotosProcedimento=[];
+    toast('Procedimento salvo'); renderView();
+  };
+}
+
+function capturarDescricaoProcedimento(){
+  const editor = document.getElementById('prDescricaoEditor');
+  if(editor && procedimentoFormDraft) procedimentoFormDraft.descricaoHtml = editor.innerHTML;
+}
+
+async function excluirProcedimento(id){
+  if(!confirm('Excluir este procedimento definitivamente?')) return;
+  DB.procedimentos = DB.procedimentos.filter(p=>p.id!==id);
+  await saveAll(KEYS.procedimentos, DB.procedimentos);
+  toast('Procedimento excluído'); renderView();
+}
+
+
 
 function attachPlanoLubEquipamentosEvents(){
   const voltarBtn = document.getElementById('voltarSecaoBtn');
@@ -1168,7 +1489,296 @@ function attachPlanoLubEquipamentosEvents(){
       render();
     };
   });
+
+  document.querySelectorAll('.pontosLubBtn').forEach(b=>{
+    b.onclick = ()=>{ planoLubMapaAtivoId=b.dataset.id; planoLubSecaoAtiva='mapaPontos'; renderView(); };
+  });
 }
+
+/* ============ FASE 5 — EDITOR GRÁFICO DE PONTOS DE LUBRIFICAÇÃO ============ */
+const FORMATOS_PONTO = [
+  {v:'ponto', l:'📍 Ponto', icone:'📍'},
+  {v:'seta', l:'➤ Seta', icone:'➤'},
+  {v:'circulo', l:'⭕ Círculo', icone:'⭕'},
+  {v:'destaque', l:'✦ Destaque', icone:'✦'}
+];
+
+function planoLubMapaPontosView(){
+  const ativo = DB.ativos.find(a=>a.id===planoLubMapaAtivoId);
+  if(!ativo) return plEmpty('⚠️','Equipamento não encontrado.') + plButton('← Voltar','voltarSecaoBtn','ghost');
+  if(!ativo.pontosLubrificacao) ativo.pontosLubrificacao = [];
+  const pontos = ativo.pontosLubrificacao;
+
+  let html = plSectionHeader(`📍 Pontos — ${ativo.codigo}`, plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">${ativo.nome} · ${pontos.length} ponto${pontos.length!==1?'s':''} cadastrado${pontos.length!==1?'s':''}</div>`;
+
+  if(!ativo.foto){
+    html += plCard(`<b>⚠️ Este equipamento não tem foto cadastrada.</b><div class="note" style="margin-top:6px">Adicione uma foto em Cadastro de Ativos → Editar, depois volte aqui para marcar os pontos.</div>`, 'var(--brick)');
+    return html;
+  }
+
+  html += `<div class="tabs-wrap">
+    <button class="btn ${planoLubModoAdicionar?'btn-amber':'btn-ghost'} btn-sm" id="modoAdicionarBtn">${planoLubModoAdicionar?'✓ Toque na imagem para adicionar':'+ Adicionar ponto'}</button>
+    <button class="btn ${planoLubModoVisualizacao?'btn-primary':'btn-ghost'} btn-sm" id="modoVisualizacaoBtn">👁️ Pré-visualização</button>
+    <button class="btn btn-ghost btn-sm" id="zoomOutBtn">−</button>
+    <button class="btn btn-ghost btn-sm" id="zoomResetBtn">${Math.round(planoLubZoom*100)}%</button>
+    <button class="btn btn-ghost btn-sm" id="zoomInBtn">+</button>
+    <button class="btn btn-ghost btn-sm" id="fullscreenBtn">⛶ Tela cheia</button>
+  </div>`;
+
+  html += `<div id="plMapaOuterWrap" style="overflow:auto;border-radius:10px;border:1px solid var(--line);background:#000;max-height:65vh">
+    <div id="plMapaContainer" style="position:relative;display:inline-block;width:${100*planoLubZoom}%;transform-origin:0 0;cursor:${planoLubModoAdicionar?'crosshair':'default'}">
+      <img id="plMapaImg" src="${ativo.foto}" style="width:100%;display:block;user-select:none;pointer-events:none">
+      ${pontos.map(p=>pontoMarkerHtml(p)).join('')}
+    </div>
+  </div>`;
+
+  if(showPontoForm) html += pontoFormSheet();
+
+  if(!planoLubModoVisualizacao){
+    html += `<h2 class="section-title" style="font-size:15px;margin-top:16px">Lista de pontos</h2>`;
+    if(pontos.length===0){ html += plEmpty('📍','Nenhum ponto marcado ainda. Toque em "+ Adicionar ponto" e depois na imagem.'); }
+    pontos.forEach(p=>{
+      html += plCard(`
+        <div class="row1" style="align-items:center">
+          <div class="desc" style="font-size:14px">${formatoIcone(p.formato)} ${p.numero}. ${p.nome||'(sem nome)'}</div>
+          ${plMenu('pt-'+p.id, [{acao:'editar',texto:'Editar'},{acao:'excluir',texto:'Excluir',classe:'danger'}])}
+        </div>
+        ${p.lubrificanteProdutoId?(()=>{ const lp=DB.produtosLub.find(x=>x.id===p.lubrificanteProdutoId); return lp?`<div class="note">${lp.descricao} — ${p.quantidade||''} ${p.unidade||''}</div>`:''; })():''}
+      `);
+    });
+  }
+  return html;
+}
+
+function formatoIcone(formato){ return (FORMATOS_PONTO.find(f=>f.v===formato)||FORMATOS_PONTO[0]).icone; }
+
+function pontoMarkerHtml(p){
+  const cor = p.formato==='destaque' ? 'var(--amber)' : 'var(--steel)';
+  const tamanho = p.formato==='circulo' ? 46 : 30;
+  return `<div class="plPontoMarker" data-id="${p.id}" style="
+      position:absolute; left:${p.x}%; top:${p.y}%; transform:translate(-50%,-50%);
+      width:${tamanho}px; height:${tamanho}px; border-radius:${p.formato==='circulo'?'50%':'50%'};
+      background:${p.formato==='circulo'?'transparent':cor}; border:${p.formato==='circulo'?'3px solid '+cor:'2px solid #fff'};
+      display:flex;align-items:center;justify-content:center; color:#fff; font-family:var(--font-mono); font-weight:700; font-size:12px;
+      cursor:grab; box-shadow:0 2px 8px rgba(0,0,0,.5); touch-action:none; user-select:none;
+    ">${p.formato==='circulo'?'':(p.formato==='seta'?'➤':(p.formato==='destaque'?'✦':p.numero))}</div>`;
+}
+
+function pontoFormSheet(){
+  const p = pontoFormDraft;
+  const fotos = {
+    geral: pendingFotoPonto.geral || p.fotoGeral || '',
+    aproximada: pendingFotoPonto.aproximada || p.fotoAproximada || '',
+    detalhada: pendingFotoPonto.detalhada || p.fotoDetalhada || ''
+  };
+  const lubrificantes = DB.produtosLub.filter(x=>x.ativo!==false);
+  return plModal('pontoOverlay', `${p.id?'Editar':'Novo'} Ponto ${p.numero?('#'+p.numero):''}`, `
+    ${plFormGroup('Formato do marcador', `<select id="ptFormato">${FORMATOS_PONTO.map(f=>`<option value="${f.v}" ${p.formato===f.v?'selected':''}>${f.l}</option>`).join('')}</select>`)}
+    ${plFormGroup('Nome do ponto', `<input id="ptNome" value="${p.nome||''}" placeholder="Ex: Mancal do motor">`)}
+    ${plFormGroup('Descrição', `<textarea id="ptDescricao" rows="2" placeholder="Detalhes do ponto">${p.descricao||''}</textarea>`)}
+
+    <label>Fotos do ponto</label>
+    <div class="row-2">
+      <div style="text-align:center">
+        <div class="note">Geral</div>
+        ${fotos.geral?`<img src="${fotos.geral}" style="width:100%;height:60px;object-fit:cover;border-radius:6px">`:`<div style="height:60px;background:var(--paper-2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+        <input type="file" accept="image/*" id="ptFotoGeral" style="margin-top:4px">
+      </div>
+      <div style="text-align:center">
+        <div class="note">Aproximada</div>
+        ${fotos.aproximada?`<img src="${fotos.aproximada}" style="width:100%;height:60px;object-fit:cover;border-radius:6px">`:`<div style="height:60px;background:var(--paper-2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+        <input type="file" accept="image/*" id="ptFotoAproximada" style="margin-top:4px">
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:8px">
+      <div class="note">Detalhada</div>
+      ${fotos.detalhada?`<img src="${fotos.detalhada}" style="width:100%;max-width:160px;height:70px;object-fit:cover;border-radius:6px">`:`<div style="max-width:160px;height:70px;background:var(--paper-2);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);margin:0 auto">${ICONS.camera}</div>`}
+      <input type="file" accept="image/*" id="ptFotoDetalhada" style="margin-top:4px;max-width:220px;margin-left:auto;margin-right:auto">
+    </div>
+
+    ${plFormGroup('Lubrificante', `<select id="ptLubrificante"><option value="">Selecione (opcional)...</option>${lubrificantes.map(l=>`<option value="${l.id}" ${p.lubrificanteProdutoId===l.id?'selected':''}>${l.codigo} — ${l.descricao}</option>`).join('')}</select>`, 'Vem direto da Sala de Lubrificantes — nenhum cadastro duplicado.')}
+    <div class="row-2">
+      <div>${plFormGroup('Quantidade', `<input id="ptQuantidade" type="number" step="0.01" value="${p.quantidade||''}">`)}</div>
+      <div>${plFormGroup('Unidade', `<input id="ptUnidade" value="${p.unidade||''}" placeholder="Ex: ml, g">`)}</div>
+    </div>
+    ${plFormGroup('Ferramenta', `<input id="ptFerramenta" value="${p.ferramenta||''}" placeholder="Ex: Engraxadeira manual">`, 'Biblioteca de ferramentas chega em fase futura — por enquanto, texto livre.')}
+    ${plFormGroup('Procedimento', `<input id="ptProcedimento" value="${p.procedimento||''}" placeholder="Ex: Limpar bico antes de aplicar">`, 'Biblioteca de procedimentos chega na Fase 7.')}
+    ${plFormGroup('Checklist', `<input id="ptChecklist" value="${p.checklist||''}" placeholder="Ex: Verificar vazamento">`, 'Biblioteca de checklists chega na Fase 8.')}
+    ${plFormGroup('Tempo padrão (minutos)', `<input id="ptTempoPadrao" type="number" value="${p.tempoPadrao||''}">`)}
+    ${plFormGroup('Observações', `<textarea id="ptObservacoes" rows="2">${p.observacoes||''}</textarea>`)}
+
+    ${plButton(p.id?'Salvar alterações':'Confirmar ponto', 'savePontoBtn', 'primary')}
+    ${p.id?plButton('Excluir ponto','deletePontoBtn','danger'):''}
+    ${plButton('Cancelar','cancelPontoBtn','ghost')}
+  `);
+}
+
+function attachPlanoLubMapaPontosEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; planoLubMapaAtivoId=null; renderView(); };
+
+  const ativo = DB.ativos.find(a=>a.id===planoLubMapaAtivoId);
+  if(!ativo || !ativo.foto) return;
+
+  const modoAddBtn = document.getElementById('modoAdicionarBtn');
+  if(modoAddBtn) modoAddBtn.onclick = ()=>{ planoLubModoAdicionar=!planoLubModoAdicionar; planoLubModoVisualizacao=false; renderView(); };
+
+  const modoVisBtn = document.getElementById('modoVisualizacaoBtn');
+  if(modoVisBtn) modoVisBtn.onclick = ()=>{ planoLubModoVisualizacao=!planoLubModoVisualizacao; planoLubModoAdicionar=false; renderView(); };
+
+  const zoomIn = document.getElementById('zoomInBtn');
+  if(zoomIn) zoomIn.onclick = ()=>{ planoLubZoom = Math.min(3, Math.round((planoLubZoom+0.2)*10)/10); renderView(); };
+  const zoomOut = document.getElementById('zoomOutBtn');
+  if(zoomOut) zoomOut.onclick = ()=>{ planoLubZoom = Math.max(0.6, Math.round((planoLubZoom-0.2)*10)/10); renderView(); };
+  const zoomReset = document.getElementById('zoomResetBtn');
+  if(zoomReset) zoomReset.onclick = ()=>{ planoLubZoom = 1; renderView(); };
+
+  const fsBtn = document.getElementById('fullscreenBtn');
+  if(fsBtn) fsBtn.onclick = ()=>{
+    const el = document.getElementById('plMapaOuterWrap');
+    if(el && el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+  };
+
+  const container = document.getElementById('plMapaContainer');
+  if(container) container.onclick = (e)=>{
+    if(!planoLubModoAdicionar) return;
+    if(e.target.closest('.plPontoMarker')) return;
+    const rect = container.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000)/10;
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 1000)/10;
+    const maxNum = (ativo.pontosLubrificacao||[]).reduce((m,p)=>Math.max(m,p.numero||0),0);
+    pontoFormDraft = {numero:maxNum+1, x, y, formato:'ponto', nome:'', descricao:'', lubrificanteProdutoId:'', quantidade:'', unidade:'', ferramenta:'', procedimento:'', checklist:'', tempoPadrao:'', observacoes:''};
+    pendingFotoPonto = {geral:'',aproximada:'',detalhada:''};
+    showPontoForm = true; planoLubModoAdicionar = false;
+    renderView();
+  };
+
+  // arrastar pontos existentes
+  document.querySelectorAll('.plPontoMarker').forEach(marker=>{
+    let dragging=false, moved=false, startX=0, startY=0;
+    marker.onpointerdown = (e)=>{
+      e.stopPropagation();
+      dragging=true; moved=false; startX=e.clientX; startY=e.clientY;
+      marker.setPointerCapture(e.pointerId);
+    };
+    marker.onpointermove = (e)=>{
+      if(!dragging) return;
+      if(Math.abs(e.clientX-startX)>4 || Math.abs(e.clientY-startY)>4) moved=true;
+      if(!moved) return;
+      const rect = container.getBoundingClientRect();
+      let x = ((e.clientX - rect.left) / rect.width) * 100;
+      let y = ((e.clientY - rect.top) / rect.height) * 100;
+      x = Math.max(0,Math.min(100,x)); y = Math.max(0,Math.min(100,y));
+      marker.style.left = x+'%'; marker.style.top = y+'%';
+      marker.dataset.pendingX = x; marker.dataset.pendingY = y;
+    };
+    marker.onpointerup = async (e)=>{
+      dragging=false;
+      if(moved){
+        const ponto = ativo.pontosLubrificacao.find(p=>p.id===marker.dataset.id);
+        if(ponto){
+          ponto.x = Math.round(parseFloat(marker.dataset.pendingX)*10)/10;
+          ponto.y = Math.round(parseFloat(marker.dataset.pendingY)*10)/10;
+          await saveAll(KEYS.ativos, DB.ativos);
+        }
+      } else {
+        const ponto = ativo.pontosLubrificacao.find(p=>p.id===marker.dataset.id);
+        if(ponto){
+          if(planoLubModoVisualizacao){ toast(`${ponto.numero}. ${ponto.nome||'(sem nome)'}`); return; }
+          pontoFormDraft = {...ponto}; pendingFotoPonto={geral:'',aproximada:'',detalhada:''};
+          showPontoForm = true; renderView();
+        }
+      }
+    };
+  });
+
+  document.querySelectorAll('.pl-menu-item').forEach(()=>{}); // garante que attachPlMenuEvents rode depois
+  attachPlMenuEvents((acao, btn)=>{
+    const ptId = btn.closest('.pl-menu-drop').id.replace('menu-pt-','');
+    const ponto = ativo.pontosLubrificacao.find(p=>p.id===ptId);
+    if(!ponto) return;
+    if(acao==='editar'){ pontoFormDraft={...ponto}; pendingFotoPonto={geral:'',aproximada:'',detalhada:''}; showPontoForm=true; renderView(); }
+    else if(acao==='excluir'){ excluirPonto(ativo, ptId); }
+  });
+
+  if(showPontoForm) attachPontoFormEvents(ativo);
+}
+
+function attachPontoFormEvents(ativo){
+  const closeX = document.querySelector('#pontoOverlay .plModalClose');
+  if(closeX) closeX.onclick = ()=>{ showPontoForm=false; pontoFormDraft=null; renderView(); };
+  const cancelBtn = document.getElementById('cancelPontoBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ showPontoForm=false; pontoFormDraft=null; renderView(); };
+
+  function wirePontoFoto(inputId, campo){
+    const el = document.getElementById(inputId);
+    if(!el) return;
+    el.onchange = (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const maxSize=360; let w=img.width,h=img.height;
+          if(w>h && w>maxSize){h=h*(maxSize/w);w=maxSize;} else if(h>=w && h>maxSize){w=w*(maxSize/h);h=maxSize;}
+          const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          pendingFotoPonto[campo] = canvas.toDataURL('image/jpeg',0.7);
+          renderView();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+  wirePontoFoto('ptFotoGeral','geral');
+  wirePontoFoto('ptFotoAproximada','aproximada');
+  wirePontoFoto('ptFotoDetalhada','detalhada');
+
+  const saveBtn = document.getElementById('savePontoBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    const nome = document.getElementById('ptNome').value.trim();
+    if(!nome){ toast('Preencha o nome do ponto'); return; }
+    const dados = {
+      formato: document.getElementById('ptFormato').value,
+      nome,
+      descricao: document.getElementById('ptDescricao').value.trim(),
+      fotoGeral: pendingFotoPonto.geral || pontoFormDraft.fotoGeral || '',
+      fotoAproximada: pendingFotoPonto.aproximada || pontoFormDraft.fotoAproximada || '',
+      fotoDetalhada: pendingFotoPonto.detalhada || pontoFormDraft.fotoDetalhada || '',
+      lubrificanteProdutoId: document.getElementById('ptLubrificante').value,
+      quantidade: document.getElementById('ptQuantidade').value,
+      unidade: document.getElementById('ptUnidade').value.trim(),
+      ferramenta: document.getElementById('ptFerramenta').value.trim(),
+      procedimento: document.getElementById('ptProcedimento').value.trim(),
+      checklist: document.getElementById('ptChecklist').value.trim(),
+      tempoPadrao: document.getElementById('ptTempoPadrao').value,
+      observacoes: document.getElementById('ptObservacoes').value.trim()
+    };
+    if(!ativo.pontosLubrificacao) ativo.pontosLubrificacao = [];
+    if(pontoFormDraft.id){
+      const existente = ativo.pontosLubrificacao.find(p=>p.id===pontoFormDraft.id);
+      Object.assign(existente, dados);
+    } else {
+      ativo.pontosLubrificacao.push({id:uid(), numero:pontoFormDraft.numero, x:pontoFormDraft.x, y:pontoFormDraft.y, ...dados});
+    }
+    await saveAll(KEYS.ativos, DB.ativos);
+    showPontoForm=false; pontoFormDraft=null; toast('Ponto salvo'); renderView();
+  };
+
+  const deleteBtn = document.getElementById('deletePontoBtn');
+  if(deleteBtn) deleteBtn.onclick = ()=>{ excluirPonto(ativo, pontoFormDraft.id); };
+}
+
+async function excluirPonto(ativo, pontoId){
+  if(!confirm('Excluir este ponto de lubrificação?')) return;
+  ativo.pontosLubrificacao = ativo.pontosLubrificacao.filter(p=>p.id!==pontoId);
+  await saveAll(KEYS.ativos, DB.ativos);
+  showPontoForm=false; pontoFormDraft=null; toast('Ponto excluído'); renderView();
+}
+
+
 
 function planoLubMaisView(){
   let html = `<h2 class="section-title">Configurações — Lubrificação</h2>`;
@@ -3320,7 +3930,27 @@ function produtoFormSheet(){
     <label>Descrição</label>
     <input id="fDescricao" value="${p.descricao}" placeholder="Ex: Parafuso M8 sextavado">
     ${moduloAtivo==='lub'?`<label>Tipo de lubrificante</label>
-    <select id="fTipoLub"><option value="">Selecione...</option>${tiposLubrificante.map(t=>`<option value="${t}" ${p.tipoLubrificante===t?'selected':''}>${t}</option>`).join('')}</select>`:''}
+    <select id="fTipoLub"><option value="">Selecione...</option>${tiposLubrificante.map(t=>`<option value="${t}" ${p.tipoLubrificante===t?'selected':''}>${t}</option>`).join('')}</select>
+    <label>Fabricante</label>
+    <input id="fFabricante" value="${p.fabricante||''}" placeholder="Ex: Petrobras, Shell, Mobil">
+    <h2 class="section-title" style="font-size:15px;margin-top:16px">Dados técnicos</h2>
+    <div class="row-2">
+      <div>${plFormGroup('ISO VG (óleos)', `<input id="fIsoVG" value="${p.isoVG||''}" placeholder="Ex: ISO VG 220">`)}</div>
+      <div>${plFormGroup('NLGI (graxas)', `<input id="fNlgi" value="${p.nlgi||''}" placeholder="Ex: NLGI 2">`)}</div>
+    </div>
+    ${plFormGroup('Espessante (graxas)', `<input id="fEspessante" value="${p.espessante||''}" placeholder="Ex: Lítio complexo">`)}
+    ${plFormGroup('Viscosidade', `<input id="fViscosidade" value="${p.viscosidade||''}" placeholder="Ex: 220 cSt a 40°C">`)}
+    <div class="row-2">
+      <div>${plFormGroup('Temp. mínima', `<input id="fTempMin" value="${p.temperaturaMinima||''}" placeholder="Ex: -10°C">`)}</div>
+      <div>${plFormGroup('Temp. máxima', `<input id="fTempMax" value="${p.temperaturaMaxima||''}" placeholder="Ex: 120°C">`)}</div>
+    </div>
+    ${plFormGroup('Cor', `<input id="fCor" value="${p.cor||''}" placeholder="Ex: Âmbar">`)}
+    ${plFormGroup('Fornecedor', `<input id="fFornecedor" value="${p.fornecedor||''}" placeholder="Ex: Distribuidora XYZ">`)}
+    ${plFormGroup('Compatibilidade', `<textarea id="fCompatibilidade" rows="2" placeholder="Ex: compatível com graxas à base de lítio">${p.compatibilidade||''}</textarea>`)}
+    ${plFormGroup('Incompatibilidade', `<textarea id="fIncompatibilidade" rows="2" placeholder="Ex: não misturar com graxa de cálcio">${p.incompatibilidade||''}</textarea>`)}
+    ${plFormGroup('Ficha Técnica (link)', `<input id="fFichaTecnica" value="${p.fichaTecnicaUrl||''}" placeholder="https://...">`)}
+    ${plFormGroup('FISPQ (link)', `<input id="fFispq" value="${p.fispqUrl||''}" placeholder="https://...">`)}
+    `:''}
     <label>Endereço (localização física)</label>
     <input id="fEndereco" value="${p.endereco||''}" placeholder="Ex: Corredor 3, Prateleira B2">
     <div class="row-2">
@@ -3388,6 +4018,22 @@ function attachProdutosEvents(){
     const unidade = document.getElementById('fUnidade').value;
     const tipoLubField = document.getElementById('fTipoLub');
     const tipoLubrificante = tipoLubField ? tipoLubField.value : '';
+    const dadosTecnicosLub = {};
+    if(moduloAtivo==='lub'){
+      dadosTecnicosLub.fabricante = document.getElementById('fFabricante').value.trim();
+      dadosTecnicosLub.isoVG = document.getElementById('fIsoVG').value.trim();
+      dadosTecnicosLub.nlgi = document.getElementById('fNlgi').value.trim();
+      dadosTecnicosLub.espessante = document.getElementById('fEspessante').value.trim();
+      dadosTecnicosLub.viscosidade = document.getElementById('fViscosidade').value.trim();
+      dadosTecnicosLub.temperaturaMinima = document.getElementById('fTempMin').value.trim();
+      dadosTecnicosLub.temperaturaMaxima = document.getElementById('fTempMax').value.trim();
+      dadosTecnicosLub.cor = document.getElementById('fCor').value.trim();
+      dadosTecnicosLub.fornecedor = document.getElementById('fFornecedor').value.trim();
+      dadosTecnicosLub.compatibilidade = document.getElementById('fCompatibilidade').value.trim();
+      dadosTecnicosLub.incompatibilidade = document.getElementById('fIncompatibilidade').value.trim();
+      dadosTecnicosLub.fichaTecnicaUrl = document.getElementById('fFichaTecnica').value.trim();
+      dadosTecnicosLub.fispqUrl = document.getElementById('fFispq').value.trim();
+    }
     const quantidade = parseFloat(document.getElementById('fQuantidade').value)||0;
     const valorUnitario = parseFloat(document.getElementById('fValor').value)||0;
     const estoqueMinimo = parseFloat(document.getElementById('fMinimo').value)||0;
@@ -3400,9 +4046,9 @@ function attachProdutosEvents(){
     }
     const foto = pendingFotoDataUrl || (editingProduto ? editingProduto.foto : '') || '';
     if(editingProduto){
-      Object.assign(editingProduto, {codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto});
+      Object.assign(editingProduto, {codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto,...dadosTecnicosLub});
     } else {
-      getProdutosArr().push({id:uid(),codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto,ativo:true,dataCadastro:new Date().toISOString()});
+      getProdutosArr().push({id:uid(),codigo,descricao,endereco,unidade,tipoLubrificante,quantidade,valorUnitario,estoqueMinimo,foto,...dadosTecnicosLub,ativo:true,dataCadastro:new Date().toISOString()});
     }
     await saveAll(getProdutosKey(), getProdutosArr());
     showProdutoForm=false; editingProduto=null; pendingFotoDataUrl=''; toast('Produto salvo'); renderView();
