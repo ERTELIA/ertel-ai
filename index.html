@@ -363,7 +363,7 @@ window.storage = {
 };
 
 /* ============ STORAGE HELPERS ============ */
-const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos', ativosRG:'ertel:ativosRG', procedimentos:'ertel:procedimentos' };
+const KEYS = { produtos:'ertel:produtos', retiradas:'ertel:retiradas', centros:'ertel:centros', usuarios:'ertel:usuarios', config:'ertel:config', produtosLub:'ertel:produtosLub', retiradasLub:'ertel:retiradasLub', ativos:'ertel:ativos', ativosRG:'ertel:ativosRG', procedimentos:'ertel:procedimentos', checklists:'ertel:checklists', planos:'ertel:planos', rotas:'ertel:rotas', historicoLub:'ertel:historicoLub' };
 
 let dbOffline = false;
 function showDbErrorBanner(msg){
@@ -406,7 +406,7 @@ async function saveAll(key, value){
   }
 }
 
-let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[], procedimentos:[] };
+let DB = { produtos:[], retiradas:[], centros:[], usuarios:[], config:{whatsappResumo:'', loginBackgroundImage:'', loginLogoImage:'', loginLogoScale:100, loginLogoOffsetX:0, loginLogoOffsetY:0, tituloTexto:'', tituloSubtexto:'', tituloFontSize:38, tituloFontFamily:'', tituloCor:'', tituloOffsetX:0, tituloOffsetY:0}, produtosLub:[], retiradasLub:[], ativos:[], ativosRG:[], procedimentos:[], checklists:[], planos:[], rotas:[], historicoLub:[] };
 let currentUser = null; // {id, nome, perfil}
 let currentView = 'dashboard';
 let scanStream = null;
@@ -428,6 +428,10 @@ async function bootstrap(){
   DB.ativos = await loadAll(KEYS.ativos, []);
   DB.ativosRG = await loadAll(KEYS.ativosRG, []);
   DB.procedimentos = await loadAll(KEYS.procedimentos, []);
+  DB.checklists = await loadAll(KEYS.checklists, []);
+  DB.planos = await loadAll(KEYS.planos, []);
+  DB.rotas = await loadAll(KEYS.rotas, []);
+  DB.historicoLub = await loadAll(KEYS.historicoLub, []);
   if(!DB.usuarios.some(u=>u.master===true)){
     DB.usuarios.push({id:uid(), nome:'Administrador Master', login:'1234', senha:'1234', perfil:'admin', master:true, ativo:true});
     await saveAll(KEYS.usuarios, DB.usuarios);
@@ -712,6 +716,11 @@ function resetModuleUiState(){
   salaMotoresTab='motoresReserva'; salaMotoresBusca='';
   planoLubSecaoAtiva=null; planoLubBusca=''; planoLubEquipBusca=''; planoLubLubBusca='';
   procedimentoSearch=''; editingProcedimento=null; showProcedimentoForm=false; procedimentoFormDraft=null; pendingFotosProcedimento=[];
+  checklistSearch=''; editingChecklist=null; showChecklistForm=false; checklistFormDraft=null;
+  planoSearch=''; editingPlano=null; planoWizardStep=0; planoWizardDraft=null;
+  rotaSearch=''; editingRota=null; showRotaForm=false; rotaFormDraft=null;
+  execucaoHistoricoId=null; execucaoPontoIndex=0; execucaoRespostas={}; pendingFotoExecucao={equipamento:'',ponto:''};
+  execucaoObservacoes=''; execucaoQuantidade=''; execucaoFerramenta=''; execucaoLubrificanteId='';
   planoLubMapaAtivoId=null; planoLubModoAdicionar=false; planoLubModoVisualizacao=false; planoLubZoom=1;
   planoLubPontoAtivo=null; showPontoForm=false; pontoFormDraft=null; pendingFotoPonto={geral:'',aproximada:'',detalhada:''};
 }
@@ -1085,6 +1094,10 @@ function planoLubModulosView(){
   if(planoLubSecaoAtiva==='mapaPontos') return planoLubMapaPontosView();
   if(planoLubSecaoAtiva==='lubrificantes') return planoLubLubrificantesView();
   if(planoLubSecaoAtiva==='procedimentos') return planoLubProcedimentosView();
+  if(planoLubSecaoAtiva==='checklists') return planoLubChecklistsView();
+  if(planoLubSecaoAtiva==='planos') return planoLubPlanosView();
+  if(planoLubSecaoAtiva==='rotas') return planoLubRotasView();
+  if(planoLubSecaoAtiva==='execucao') return planoLubExecucaoView();
   if(planoLubSecaoAtiva){
     const s = SECOES_PLANOLUB.find(x=>x.id===planoLubSecaoAtiva);
     let html = plSectionHeader(`${s.icone} ${s.nome}`, plButton('← Voltar','voltarSecaoBtn','ghost'));
@@ -1098,7 +1111,7 @@ function planoLubModulosView(){
       <div class="row1" style="align-items:center">
         <div class="desc" style="font-size:15px;cursor:pointer" data-id="${s.id}">${s.icone} ${s.nome}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          ${plBadge(['equipamentos','lubrificantes','procedimentos'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos'].includes(s.id)?'ok':'warn')}
+          ${plBadge(['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao'].includes(s.id)?'ok':'warn')}
           ${plMenu('sec-'+s.id, [{acao:'abrir',texto:'Abrir seção'},{acao:'info',texto:'Sobre esta seção'}])}
         </div>
       </div>
@@ -1113,6 +1126,10 @@ function attachPlanoLubModulosEvents(){
   if(planoLubSecaoAtiva==='mapaPontos'){ attachPlanoLubMapaPontosEvents(); return; }
   if(planoLubSecaoAtiva==='lubrificantes'){ attachPlanoLubLubrificantesEvents(); return; }
   if(planoLubSecaoAtiva==='procedimentos'){ attachPlanoLubProcedimentosEvents(); return; }
+  if(planoLubSecaoAtiva==='checklists'){ attachPlanoLubChecklistsEvents(); return; }
+  if(planoLubSecaoAtiva==='planos'){ attachPlanoLubPlanosEvents(); return; }
+  if(planoLubSecaoAtiva==='rotas'){ attachPlanoLubRotasEvents(); return; }
+  if(planoLubSecaoAtiva==='execucao'){ attachPlanoLubExecucaoEvents(); return; }
   const voltarBtn = document.getElementById('voltarSecaoBtn');
   if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
 
@@ -1464,6 +1481,968 @@ async function excluirProcedimento(id){
   DB.procedimentos = DB.procedimentos.filter(p=>p.id!==id);
   await saveAll(KEYS.procedimentos, DB.procedimentos);
   toast('Procedimento excluído'); renderView();
+}
+
+/* ============ FASE 8 — BIBLIOTECA DE CHECKLISTS ============ */
+const TIPOS_ITEM_CHECKLIST = ['Conforme/Não Conforme','Realizado/Não Realizado','Texto','Texto longo','Número','Data','Hora','Foto','Vídeo','Áudio','Assinatura','Arquivo','QR Code','Código de barras'];
+const MOTIVOS_NAO_REALIZADO = ['Equipamento em produção','Sem acesso','Sem lubrificante','Condição insegura','Peça indisponível','Outro'];
+
+let checklistSearch = '';
+let editingChecklist = null;
+let showChecklistForm = false;
+let checklistFormDraft = null;
+
+function proximoCodigoChecklist(){
+  let maxNum = 0;
+  DB.checklists.forEach(c=>{
+    const m = /^CHK-(\d+)$/.exec(c.codigo||'');
+    if(m){ const n = parseInt(m[1],10); if(n>maxNum) maxNum = n; }
+  });
+  return 'CHK-' + String(maxNum+1).padStart(4,'0');
+}
+
+function planoLubChecklistsView(){
+  const isAdmin = isAdminLevel();
+  const termo = checklistSearch.toLowerCase();
+  const lista = DB.checklists.filter(c=>c.ativo!==false && ((c.nome||'').toLowerCase().includes(termo) || (c.codigo||'').toLowerCase().includes(termo) || (c.categoria||'').toLowerCase().includes(termo)));
+
+  let html = plSectionHeader('✅ Checklists', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Biblioteca reutilizável — cada checklist é montado uma vez aqui e vinculado nos pontos de lubrificação e planos.</div>`;
+  html += `<div class="search"><input id="chkSearchInput" placeholder="Buscar por código, nome ou categoria" value="${checklistSearch}">
+    ${isAdmin?plButton('+ Novo','newChkBtn','primary'):''}
+  </div>`;
+
+  if(lista.length===0){ html += plEmpty('✅','Nenhum checklist cadastrado ainda.'); }
+  lista.forEach(c=>{
+    const qtdItens = (c.itens||[]).length;
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="codigo">${c.codigo}</span>
+          ${plBadge('rev. '+(c.revisao||1), 'neutral')}
+        </div>
+        ${isAdmin?plMenu('chk-'+c.id, [{acao:'editar',texto:'Editar'},{acao:'historico',texto:'Histórico de revisões'},{acao:'excluir',texto:'Excluir',classe:'danger'}]):''}
+      </div>
+      <div class="desc">${c.nome}</div>
+      <div class="meta"><span>${c.categoria||'—'}</span><span>${qtdItens} item${qtdItens!==1?'s':''}</span></div>
+    `);
+  });
+
+  if(showChecklistForm && isAdmin) html += checklistFormSheet();
+  return html;
+}
+
+function checklistFormSheet(){
+  if(!checklistFormDraft) checklistFormDraft = {
+    nome: editingChecklist?.nome||'', categoria: editingChecklist?.categoria||'', descricao: editingChecklist?.descricao||'',
+    itens: editingChecklist ? JSON.parse(JSON.stringify(editingChecklist.itens||[])) : []
+  };
+  const c = checklistFormDraft;
+  const codigo = editingChecklist ? editingChecklist.codigo : proximoCodigoChecklist();
+
+  return plModal('chkOverlay', `${editingChecklist?'Editar':'Novo'} Checklist — <span style="color:var(--amber)">${codigo}</span>`, `
+    ${plFormGroup('Nome', `<input id="chkNome" value="${c.nome}" placeholder="Ex: Checklist de lubrificação de mancal">`)}
+    ${plFormGroup('Categoria', `<input id="chkCategoria" value="${c.categoria}" placeholder="Ex: Mecânica">`)}
+    ${plFormGroup('Descrição', `<textarea id="chkDescricao" rows="2">${c.descricao}</textarea>`)}
+
+    <h2 class="section-title" style="font-size:15px;margin-top:16px">Itens do checklist (${c.itens.length})</h2>
+    <div id="chkItensList">
+      ${c.itens.map((it,i)=>`
+        <div class="card" style="padding:10px">
+          <div class="row1" style="align-items:center">
+            <b style="font-size:13px">${i+1}. ${it.texto}</b>
+            <div style="display:flex;gap:4px">
+              ${i>0?`<button type="button" class="btn btn-ghost btn-sm moveItemUpBtn" data-idx="${i}" style="width:auto;margin:0;padding:4px 8px">▲</button>`:''}
+              ${i<c.itens.length-1?`<button type="button" class="btn btn-ghost btn-sm moveItemDownBtn" data-idx="${i}" style="width:auto;margin:0;padding:4px 8px">▼</button>`:''}
+              <button type="button" class="btn btn-danger btn-sm removeItemBtn" data-idx="${i}" style="width:auto;margin:0;padding:4px 8px">×</button>
+            </div>
+          </div>
+          <div class="meta"><span>${it.tipo}</span><span>${it.obrigatorio?'Obrigatório':'Opcional'}</span></div>
+          ${it.tipo==='Realizado/Não Realizado'?`<div class="note">Se marcado "Não Realizado", vai pedir o motivo (${MOTIVOS_NAO_REALIZADO.join(', ')}) na execução.</div>`:''}
+        </div>
+      `).join('')}
+      ${c.itens.length===0?'<div class="note">Nenhum item adicionado ainda.</div>':''}
+    </div>
+
+    <div class="card" style="margin-top:10px;border-color:var(--steel)">
+      <label>Novo item</label>
+      <input id="novoItemTexto" placeholder="Ex: Verificar vazamento de óleo">
+      <label>Tipo de resposta</label>
+      <select id="novoItemTipo">${TIPOS_ITEM_CHECKLIST.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
+      <label class="remember" style="color:var(--ink);margin-top:8px"><input type="checkbox" id="novoItemObrigatorio" checked> Item obrigatório</label>
+      ${plButton('+ Adicionar item','addItemChkBtn','amber')}
+    </div>
+
+    ${editingChecklist?plFormGroup('Resumo da revisão (opcional)', `<input id="chkResumoRevisao" placeholder="O que mudou nesta edição?">`, `Salvar vai criar a revisão ${(editingChecklist.revisao||1)+1}.`):''}
+
+    ${plButton(editingChecklist?'Salvar alterações':'Confirmar cadastro','saveChkBtn','primary')}
+    ${plButton('Cancelar','cancelChkBtn','ghost')}
+  `);
+}
+
+function capturarCamposChecklist(){
+  if(!checklistFormDraft) return;
+  const g = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if(g('chkNome')!==undefined) checklistFormDraft.nome = g('chkNome').trim();
+  if(g('chkCategoria')!==undefined) checklistFormDraft.categoria = g('chkCategoria').trim();
+  if(g('chkDescricao')!==undefined) checklistFormDraft.descricao = g('chkDescricao').trim();
+}
+
+function attachPlanoLubChecklistsEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('chkSearchInput');
+  if(s) s.oninput = ()=>{
+    checklistSearch = s.value; renderView();
+    const el = document.getElementById('chkSearchInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  const newBtn = document.getElementById('newChkBtn');
+  if(newBtn) newBtn.onclick = ()=>{ editingChecklist=null; checklistFormDraft=null; showChecklistForm=true; renderView(); };
+
+  attachPlMenuEvents((acao, btn)=>{
+    const id = btn.closest('.pl-menu-drop').id.replace('menu-chk-','');
+    const c = DB.checklists.find(x=>x.id===id);
+    if(!c) return;
+    if(acao==='editar'){ editingChecklist=c; checklistFormDraft=null; showChecklistForm=true; renderView(); }
+    else if(acao==='excluir'){ excluirChecklist(id); }
+    else if(acao==='historico'){ mostrarHistoricoRevisoesChecklist(c); }
+  });
+
+  if(showChecklistForm) attachChecklistFormEvents();
+}
+
+function mostrarHistoricoRevisoesChecklist(c){
+  const hist = c.historicoRevisoes || [];
+  if(hist.length===0){ toast('Nenhuma revisão registrada além da criação.'); return; }
+  const linhas = hist.slice().reverse().map(h=>`Rev. ${h.revisao} — ${new Date(h.data).toLocaleDateString('pt-BR')}${h.resumo?': '+h.resumo:''}`).join('\n');
+  alert(`Histórico de revisões — ${c.nome}\n\n${linhas}`);
+}
+
+function attachChecklistFormEvents(){
+  const closeX = document.querySelector('#chkOverlay .plModalClose');
+  if(closeX) closeX.onclick = ()=>{ showChecklistForm=false; checklistFormDraft=null; editingChecklist=null; renderView(); };
+  const cancelBtn = document.getElementById('cancelChkBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ showChecklistForm=false; checklistFormDraft=null; editingChecklist=null; renderView(); };
+
+  const addItemBtn = document.getElementById('addItemChkBtn');
+  if(addItemBtn) addItemBtn.onclick = ()=>{
+    const texto = document.getElementById('novoItemTexto').value.trim();
+    if(!texto){ toast('Descreva o item antes de adicionar'); return; }
+    capturarCamposChecklist();
+    checklistFormDraft.itens.push({
+      id: uid(), texto,
+      tipo: document.getElementById('novoItemTipo').value,
+      obrigatorio: document.getElementById('novoItemObrigatorio').checked
+    });
+    renderView();
+  };
+
+  document.querySelectorAll('.moveItemUpBtn').forEach(b=>{
+    b.onclick = ()=>{ capturarCamposChecklist(); const i=parseInt(b.dataset.idx); const arr=checklistFormDraft.itens; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; renderView(); };
+  });
+  document.querySelectorAll('.moveItemDownBtn').forEach(b=>{
+    b.onclick = ()=>{ capturarCamposChecklist(); const i=parseInt(b.dataset.idx); const arr=checklistFormDraft.itens; [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; renderView(); };
+  });
+  document.querySelectorAll('.removeItemBtn').forEach(b=>{
+    b.onclick = ()=>{ capturarCamposChecklist(); checklistFormDraft.itens.splice(parseInt(b.dataset.idx),1); renderView(); };
+  });
+
+  const saveBtn = document.getElementById('saveChkBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    capturarCamposChecklist();
+    if(!checklistFormDraft.nome){ toast('Preencha o nome do checklist'); return; }
+    if(checklistFormDraft.itens.length===0){ toast('Adicione pelo menos um item ao checklist'); return; }
+
+    if(editingChecklist){
+      const resumoField = document.getElementById('chkResumoRevisao');
+      const resumo = resumoField ? resumoField.value.trim() : '';
+      Object.assign(editingChecklist, {nome:checklistFormDraft.nome, categoria:checklistFormDraft.categoria, descricao:checklistFormDraft.descricao, itens:checklistFormDraft.itens});
+      editingChecklist.revisao = (editingChecklist.revisao||1) + 1;
+      if(!editingChecklist.historicoRevisoes) editingChecklist.historicoRevisoes = [];
+      editingChecklist.historicoRevisoes.push({revisao:editingChecklist.revisao, data:new Date().toISOString(), resumo: resumo || 'Atualizado'});
+    } else {
+      DB.checklists.push({
+        id:uid(), codigo:proximoCodigoChecklist(), nome:checklistFormDraft.nome, categoria:checklistFormDraft.categoria,
+        descricao:checklistFormDraft.descricao, itens:checklistFormDraft.itens,
+        revisao:1, historicoRevisoes:[{revisao:1, data:new Date().toISOString(), resumo:'Criação'}],
+        ativo:true, dataCadastro:new Date().toISOString()
+      });
+    }
+    await saveAll(KEYS.checklists, DB.checklists);
+    showChecklistForm=false; checklistFormDraft=null; editingChecklist=null;
+    toast('Checklist salvo'); renderView();
+  };
+}
+
+async function excluirChecklist(id){
+  if(!confirm('Excluir este checklist definitivamente?')) return;
+  DB.checklists = DB.checklists.filter(c=>c.id!==id);
+  await saveAll(KEYS.checklists, DB.checklists);
+  toast('Checklist excluído'); renderView();
+}
+
+/* ============ FASE 9 — PLANO DE LUBRIFICAÇÃO (assistente guiado) ============ */
+const FREQUENCIAS_PLANO = ['Diária','Semanal','Quinzenal','Mensal','Bimestral','Trimestral','Semestral','Anual'];
+const ETAPAS_WIZARD = ['Equipamento','Pontos','Procedimento','Checklist','Lubrificante','Ferramenta','Frequência','Revisar'];
+
+let planoSearch = '';
+let editingPlano = null;
+let planoWizardStep = 0; // 0 = fora do assistente (lista)
+let planoWizardDraft = null;
+
+function proximoCodigoPlano(){
+  let maxNum = 0;
+  DB.planos.forEach(p=>{
+    const m = /^PLANO-(\d+)$/.exec(p.codigo||'');
+    if(m){ const n = parseInt(m[1],10); if(n>maxNum) maxNum = n; }
+  });
+  return 'PLANO-' + String(maxNum+1).padStart(4,'0');
+}
+
+function planoLubPlanosView(){
+  if(planoWizardStep>0) return planoWizardView();
+  const isAdmin = isAdminLevel();
+  const termo = planoSearch.toLowerCase();
+  const lista = DB.planos.filter(p=>p.ativo!==false).filter(p=>{
+    const ativo = DB.ativos.find(a=>a.id===p.ativoId);
+    return (p.codigo||'').toLowerCase().includes(termo) || (ativo?.nome||'').toLowerCase().includes(termo) || (ativo?.codigo||'').toLowerCase().includes(termo);
+  });
+
+  let html = plSectionHeader('🧭 Planos de Lubrificação', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Assistente guiado: liga equipamento, pontos, procedimento, checklist, lubrificante, ferramenta e frequência — tudo reaproveitado do que já existe.</div>`;
+  html += `<div class="search"><input id="planoSearchInput" placeholder="Buscar por código ou equipamento" value="${planoSearch}">
+    ${isAdmin?plButton('+ Novo plano','newPlanoBtn','primary'):''}
+  </div>`;
+
+  if(lista.length===0){ html += plEmpty('🧭','Nenhum plano cadastrado ainda.'); }
+  lista.forEach(p=>{
+    const ativo = DB.ativos.find(a=>a.id===p.ativoId);
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <span class="codigo">${p.codigo}</span>
+        ${isAdmin?plMenu('plano-'+p.id, [{acao:'editar',texto:'Editar'},{acao:'excluir',texto:'Excluir',classe:'danger'}]):''}
+      </div>
+      <div class="desc">${ativo?ativo.nome:'(equipamento removido)'}</div>
+      <div class="meta"><span>${(p.pontosIds||[]).length} ponto${(p.pontosIds||[]).length!==1?'s':''}</span><span>${p.frequencia||'—'}</span></div>
+    `);
+  });
+  return html;
+}
+
+function attachPlanoLubPlanosEvents(){
+  if(planoWizardStep>0){ attachPlanoWizardEvents(); return; }
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('planoSearchInput');
+  if(s) s.oninput = ()=>{
+    planoSearch = s.value; renderView();
+    const el = document.getElementById('planoSearchInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  const newBtn = document.getElementById('newPlanoBtn');
+  if(newBtn) newBtn.onclick = ()=>{
+    editingPlano=null;
+    planoWizardDraft = {ativoId:'', pontosIds:[], procedimentoId:'', checklistId:'', lubrificanteProdutoId:'', ferramenta:'', frequencia:''};
+    planoWizardStep=1; renderView();
+  };
+
+  attachPlMenuEvents((acao, btn)=>{
+    const id = btn.closest('.pl-menu-drop').id.replace('menu-plano-','');
+    const p = DB.planos.find(x=>x.id===id);
+    if(!p) return;
+    if(acao==='editar'){
+      editingPlano=p;
+      planoWizardDraft = {ativoId:p.ativoId, pontosIds:[...(p.pontosIds||[])], procedimentoId:p.procedimentoId||'', checklistId:p.checklistId||'', lubrificanteProdutoId:p.lubrificanteProdutoId||'', ferramenta:p.ferramenta||'', frequencia:p.frequencia||''};
+      planoWizardStep=1; renderView();
+    } else if(acao==='excluir'){ excluirPlano(id); }
+  });
+}
+
+function planoWizardView(){
+  const d = planoWizardDraft;
+  let html = plSectionHeader(`🧭 ${editingPlano?'Editar':'Novo'} Plano — Passo ${planoWizardStep} de ${ETAPAS_WIZARD.length}`, plButton('Cancelar','cancelWizardBtn','ghost'));
+  html += `<div class="tabs-wrap">${ETAPAS_WIZARD.map((e,i)=>plBadge(`${i+1}. ${e}`, i+1===planoWizardStep?'info':(i+1<planoWizardStep?'ok':'neutral'))).join('')}</div>`;
+
+  if(planoWizardStep===1){
+    html += `<h2 class="section-title" style="font-size:15px">Selecione o equipamento</h2>`;
+    const ativos = DB.ativos.filter(a=>a.ativo!==false);
+    if(ativos.length===0){ html += plEmpty('⚙️','Nenhum equipamento cadastrado — cadastre em Cadastro de Ativos primeiro.'); }
+    ativos.forEach(a=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizAtivo" value="${a.id}" ${d.ativoId===a.id?'checked':''}> <b>${a.codigo}</b> — ${a.nome} <span style="color:var(--muted)">(${(a.pontosLubrificacao||[]).length} pontos)</span></label>`);
+    });
+  }
+  else if(planoWizardStep===2){
+    const ativo = DB.ativos.find(a=>a.id===d.ativoId);
+    const pontos = ativo?.pontosLubrificacao||[];
+    html += `<h2 class="section-title" style="font-size:15px">Selecione os pontos — ${ativo?ativo.nome:''}</h2>`;
+    if(pontos.length===0){ html += plEmpty('📍','Este equipamento ainda não tem pontos de lubrificação cadastrados. Volte e cadastre em Equipamentos → Pontos de lubrificação.'); }
+    pontos.forEach(p=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="checkbox" class="wizPontoChk" value="${p.id}" ${d.pontosIds.includes(p.id)?'checked':''}> ${formatoIcone(p.formato)} <b>${p.numero}. ${p.nome}</b></label>`);
+    });
+  }
+  else if(planoWizardStep===3){
+    html += `<h2 class="section-title" style="font-size:15px">Selecione o procedimento (opcional)</h2>`;
+    html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizProc" value="" ${!d.procedimentoId?'checked':''}> Nenhum</label>`);
+    DB.procedimentos.filter(p=>p.ativo!==false).forEach(p=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizProc" value="${p.id}" ${d.procedimentoId===p.id?'checked':''}> <b>${p.codigo}</b> — ${p.nome}</label>`);
+    });
+  }
+  else if(planoWizardStep===4){
+    html += `<h2 class="section-title" style="font-size:15px">Selecione o checklist (opcional)</h2>`;
+    html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizChk" value="" ${!d.checklistId?'checked':''}> Nenhum</label>`);
+    DB.checklists.filter(c=>c.ativo!==false).forEach(c=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizChk" value="${c.id}" ${d.checklistId===c.id?'checked':''}> <b>${c.codigo}</b> — ${c.nome}</label>`);
+    });
+  }
+  else if(planoWizardStep===5){
+    html += `<h2 class="section-title" style="font-size:15px">Selecione o lubrificante padrão do plano (opcional)</h2>`;
+    html += `<div class="note" style="margin-bottom:10px">Cada ponto já pode ter seu próprio lubrificante — isso aqui é só um padrão de referência do plano.</div>`;
+    html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizLub" value="" ${!d.lubrificanteProdutoId?'checked':''}> Nenhum / usar o de cada ponto</label>`);
+    DB.produtosLub.filter(p=>p.ativo!==false).forEach(p=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizLub" value="${p.id}" ${d.lubrificanteProdutoId===p.id?'checked':''}> <b>${p.codigo}</b> — ${p.descricao}</label>`);
+    });
+  }
+  else if(planoWizardStep===6){
+    html += `<h2 class="section-title" style="font-size:15px">Ferramenta</h2>`;
+    html += plFormGroup('Ferramenta utilizada', `<input id="wizFerramenta" value="${d.ferramenta||''}" placeholder="Ex: Engraxadeira manual">`, 'Biblioteca de ferramentas própria chega em fase futura.');
+  }
+  else if(planoWizardStep===7){
+    html += `<h2 class="section-title" style="font-size:15px">Frequência</h2>`;
+    FREQUENCIAS_PLANO.forEach(f=>{
+      html += plCard(`<label class="remember" style="color:var(--ink)"><input type="radio" name="wizFreq" value="${f}" ${d.frequencia===f?'checked':''}> ${f}</label>`);
+    });
+  }
+  else if(planoWizardStep===8){
+    const ativo = DB.ativos.find(a=>a.id===d.ativoId);
+    const proc = DB.procedimentos.find(p=>p.id===d.procedimentoId);
+    const chk = DB.checklists.find(c=>c.id===d.checklistId);
+    const lub = DB.produtosLub.find(p=>p.id===d.lubrificanteProdutoId);
+    html += `<h2 class="section-title" style="font-size:15px">Revisar e salvar</h2>`;
+    html += plCard(`
+      <div class="meta"><span>Equipamento</span><span><b>${ativo?ativo.nome:'—'}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Pontos</span><span><b>${d.pontosIds.length}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Procedimento</span><span><b>${proc?proc.nome:'Nenhum'}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Checklist</span><span><b>${chk?chk.nome:'Nenhum'}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Lubrificante</span><span><b>${lub?lub.descricao:'Por ponto'}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Ferramenta</span><span><b>${d.ferramenta||'—'}</b></span></div>
+      <div class="meta" style="margin-top:6px"><span>Frequência</span><span><b>${d.frequencia||'—'}</b></span></div>
+    `);
+  }
+
+  html += `<div class="row-2" style="margin-top:16px">
+    ${planoWizardStep>1?plButton('← Voltar','wizVoltarBtn','ghost'):'<div></div>'}
+    ${planoWizardStep<ETAPAS_WIZARD.length?plButton('Avançar →','wizAvancarBtn','primary'):plButton('✓ Salvar plano','wizSalvarBtn','primary')}
+  </div>`;
+  return html;
+}
+
+function attachPlanoWizardEvents(){
+  const cancelBtn = document.getElementById('cancelWizardBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ planoWizardStep=0; planoWizardDraft=null; editingPlano=null; renderView(); };
+
+  const capturarPasso = ()=>{
+    const d = planoWizardDraft;
+    if(planoWizardStep===1){ const sel=document.querySelector('input[name="wizAtivo"]:checked'); if(sel) d.ativoId=sel.value; }
+    else if(planoWizardStep===2){ d.pontosIds = Array.from(document.querySelectorAll('.wizPontoChk:checked')).map(el=>el.value); }
+    else if(planoWizardStep===3){ const sel=document.querySelector('input[name="wizProc"]:checked'); d.procedimentoId = sel?sel.value:''; }
+    else if(planoWizardStep===4){ const sel=document.querySelector('input[name="wizChk"]:checked'); d.checklistId = sel?sel.value:''; }
+    else if(planoWizardStep===5){ const sel=document.querySelector('input[name="wizLub"]:checked'); d.lubrificanteProdutoId = sel?sel.value:''; }
+    else if(planoWizardStep===6){ const el=document.getElementById('wizFerramenta'); if(el) d.ferramenta=el.value.trim(); }
+    else if(planoWizardStep===7){ const sel=document.querySelector('input[name="wizFreq"]:checked'); d.frequencia = sel?sel.value:''; }
+  };
+
+  const voltarBtn = document.getElementById('wizVoltarBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ capturarPasso(); planoWizardStep--; renderView(); };
+
+  const avancarBtn = document.getElementById('wizAvancarBtn');
+  if(avancarBtn) avancarBtn.onclick = ()=>{
+    capturarPasso();
+    if(planoWizardStep===1 && !planoWizardDraft.ativoId){ toast('Selecione um equipamento'); return; }
+    if(planoWizardStep===2 && planoWizardDraft.pontosIds.length===0){ toast('Selecione pelo menos um ponto'); return; }
+    planoWizardStep++; renderView();
+  };
+
+  const salvarBtn = document.getElementById('wizSalvarBtn');
+  if(salvarBtn) salvarBtn.onclick = async ()=>{
+    const d = planoWizardDraft;
+    if(editingPlano){
+      Object.assign(editingPlano, d);
+    } else {
+      DB.planos.push({id:uid(), codigo:proximoCodigoPlano(), ...d, ativo:true, dataCadastro:new Date().toISOString()});
+    }
+    await saveAll(KEYS.planos, DB.planos);
+    planoWizardStep=0; planoWizardDraft=null; editingPlano=null;
+    toast('Plano salvo'); renderView();
+  };
+}
+
+async function excluirPlano(id){
+  if(!confirm('Excluir este plano de lubrificação definitivamente?')) return;
+  DB.planos = DB.planos.filter(p=>p.id!==id);
+  await saveAll(KEYS.planos, DB.planos);
+  toast('Plano excluído'); renderView();
+}
+
+/* ============ FASE 10 — CRIADOR DE ROTAS ============ */
+const CRITERIOS_ROTA = [
+  {v:'equipamento', l:'Por equipamento'}, {v:'setor', l:'Por setor/área (texto da localização)'},
+  {v:'frequencia', l:'Por frequência do plano'}, {v:'lubrificante', l:'Por lubrificante'},
+  {v:'criticidade', l:'Por criticidade'}, {v:'manual', l:'Manualmente (escolher ponto a ponto)'}
+];
+
+let rotaSearch = '';
+let editingRota = null;
+let showRotaForm = false;
+let rotaFormDraft = null;
+
+function proximoCodigoRota(){
+  let maxNum = 0;
+  DB.rotas.forEach(r=>{
+    const m = /^ROTA-(\d+)$/.exec(r.codigo||'');
+    if(m){ const n = parseInt(m[1],10); if(n>maxNum) maxNum = n; }
+  });
+  return 'ROTA-' + String(maxNum+1).padStart(4,'0');
+}
+
+// Retorna [{ponto, ativo}] com todos os pontos de todos os equipamentos
+function todosOsPontos(){
+  const out = [];
+  DB.ativos.filter(a=>a.ativo!==false).forEach(a=>{
+    (a.pontosLubrificacao||[]).forEach(p=>out.push({ponto:p, ativo:a}));
+  });
+  return out;
+}
+
+function candidatosRota(criterio, valor){
+  const todos = todosOsPontos();
+  if(criterio==='equipamento') return todos.filter(x=>x.ativo.id===valor);
+  if(criterio==='setor') return valor ? todos.filter(x=>(x.ativo.localizacao||'').toLowerCase().includes(valor.toLowerCase())) : [];
+  if(criterio==='criticidade') return valor ? todos.filter(x=>x.ativo.criticidade===valor) : [];
+  if(criterio==='lubrificante') return valor ? todos.filter(x=>x.ponto.lubrificanteProdutoId===valor) : [];
+  if(criterio==='frequencia'){
+    if(!valor) return [];
+    const planosComFreq = DB.planos.filter(p=>p.ativo!==false && p.frequencia===valor);
+    const pontosIds = new Set();
+    planosComFreq.forEach(p=>(p.pontosIds||[]).forEach(id=>pontosIds.add(id)));
+    return todos.filter(x=>pontosIds.has(x.ponto.id));
+  }
+  return []; // manual
+}
+
+function planoLubRotasView(){
+  const isAdmin = isAdminLevel();
+  const termo = rotaSearch.toLowerCase();
+  const lista = DB.rotas.filter(r=>r.ativo!==false && ((r.nome||'').toLowerCase().includes(termo) || (r.codigo||'').toLowerCase().includes(termo)));
+
+  let html = plSectionHeader('🗺️ Rotas', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Agrupe pontos de lubrificação por equipamento, setor, frequência, lubrificante, criticidade — ou escolha manualmente.</div>`;
+  html += `<div class="search"><input id="rotaSearchInput" placeholder="Buscar por código ou nome" value="${rotaSearch}">
+    ${isAdmin?plButton('+ Nova rota','newRotaBtn','primary'):''}
+  </div>`;
+
+  if(lista.length===0){ html += plEmpty('🗺️','Nenhuma rota cadastrada ainda.'); }
+  lista.forEach(r=>{
+    const resp = DB.usuarios.find(u=>u.id===r.responsavelUserId);
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <span class="codigo">${r.codigo}</span>
+        ${isAdmin?plMenu('rota-'+r.id, [{acao:'editar',texto:'Editar'},{acao:'excluir',texto:'Excluir',classe:'danger'}]):''}
+      </div>
+      <div class="desc">${r.nome}</div>
+      <div class="meta"><span>${(r.pontosIds||[]).length} ponto${(r.pontosIds||[]).length!==1?'s':''}</span><span>${r.tempoPrevisto?r.tempoPrevisto+' min':'—'}</span></div>
+      <div class="meta" style="margin-top:2px"><span>${r.area||r.setor||'—'}</span><span>${resp?resp.nome:'Sem responsável'}</span></div>
+    `);
+  });
+
+  if(showRotaForm && isAdmin) html += rotaFormSheet();
+  return html;
+}
+
+function rotaFormSheet(){
+  if(!rotaFormDraft) rotaFormDraft = {
+    nome: editingRota?.nome||'', descricao: editingRota?.descricao||'', area: editingRota?.area||'', setor: editingRota?.setor||'',
+    tempoPrevisto: editingRota?.tempoPrevisto||'', responsavelUserId: editingRota?.responsavelUserId||'',
+    criterio: editingRota?.criterio||'equipamento', criterioValor: editingRota?.criterioValor||'',
+    pontosIds: editingRota ? [...(editingRota.pontosIds||[])] : []
+  };
+  const r = rotaFormDraft;
+  const codigo = editingRota ? editingRota.codigo : proximoCodigoRota();
+  const usuariosAtivos = DB.usuarios.filter(u=>u.ativo!==false);
+
+  let seletorCriterio = '';
+  if(r.criterio==='equipamento'){
+    seletorCriterio = `<select id="rotaCriterioValor"><option value="">Selecione o equipamento...</option>${DB.ativos.filter(a=>a.ativo!==false).map(a=>`<option value="${a.id}" ${r.criterioValor===a.id?'selected':''}>${a.codigo} — ${a.nome}</option>`).join('')}</select>`;
+  } else if(r.criterio==='setor'){
+    seletorCriterio = `<input id="rotaCriterioValor" value="${r.criterioValor}" placeholder="Ex: Linha 2, Setor produção...">`;
+  } else if(r.criterio==='criticidade'){
+    seletorCriterio = `<select id="rotaCriterioValor"><option value="">Selecione...</option>${CRITICIDADES.map(c=>`<option value="${c.v}" ${r.criterioValor===c.v?'selected':''}>${c.l}</option>`).join('')}</select>`;
+  } else if(r.criterio==='lubrificante'){
+    seletorCriterio = `<select id="rotaCriterioValor"><option value="">Selecione...</option>${DB.produtosLub.filter(p=>p.ativo!==false).map(p=>`<option value="${p.id}" ${r.criterioValor===p.id?'selected':''}>${p.codigo} — ${p.descricao}</option>`).join('')}</select>`;
+  } else if(r.criterio==='frequencia'){
+    seletorCriterio = `<select id="rotaCriterioValor"><option value="">Selecione...</option>${FREQUENCIAS_PLANO.map(f=>`<option value="${f}" ${r.criterioValor===f?'selected':''}>${f}</option>`).join('')}</select>`;
+  }
+
+  const candidatos = r.criterio==='manual' ? todosOsPontos() : candidatosRota(r.criterio, r.criterioValor);
+
+  return plModal('rotaOverlay', `${editingRota?'Editar':'Nova'} Rota — <span style="color:var(--amber)">${codigo}</span>`, `
+    ${plFormGroup('Nome da rota', `<input id="rotaNome" value="${r.nome}" placeholder="Ex: Rota semanal — Linha 2">`)}
+    ${plFormGroup('Descrição', `<textarea id="rotaDescricao" rows="2">${r.descricao}</textarea>`)}
+    <div class="row-2">
+      <div>${plFormGroup('Área', `<input id="rotaArea" value="${r.area}" placeholder="Ex: Produção">`)}</div>
+      <div>${plFormGroup('Setor', `<input id="rotaSetor" value="${r.setor}" placeholder="Ex: Linha 2">`)}</div>
+    </div>
+    <div class="row-2">
+      <div>${plFormGroup('Tempo previsto (min)', `<input id="rotaTempoPrevisto" type="number" value="${r.tempoPrevisto}">`)}</div>
+      <div>${plFormGroup('Responsável', `<select id="rotaResponsavel"><option value="">Sem responsável</option>${usuariosAtivos.map(u=>`<option value="${u.id}" ${r.responsavelUserId===u.id?'selected':''}>${u.nome}</option>`).join('')}</select>`)}</div>
+    </div>
+
+    <label>Agrupar pontos por</label>
+    <select id="rotaCriterio">${CRITERIOS_ROTA.map(c=>`<option value="${c.v}" ${r.criterio===c.v?'selected':''}>${c.l}</option>`).join('')}</select>
+    ${r.criterio!=='manual'?`<label>Filtro</label>${seletorCriterio}`:''}
+
+    <h2 class="section-title" style="font-size:15px;margin-top:16px">${r.criterio==='manual'?'Escolha os pontos':'Pontos encontrados'} (${r.pontosIds.length} selecionado${r.pontosIds.length!==1?'s':''})</h2>
+    <div id="rotaPontosList">
+      ${candidatos.length===0?plEmpty('📍', r.criterio==='manual'?'Nenhum ponto cadastrado no sistema ainda.':'Nenhum ponto encontrado para esse filtro.'):''}
+      ${candidatos.map(({ponto,ativo})=>`
+        <label class="remember" style="color:var(--ink);display:block;padding:8px;border-bottom:1px solid var(--line)">
+          <input type="checkbox" class="rotaPontoChk" value="${ponto.id}" ${r.pontosIds.includes(ponto.id)?'checked':''}>
+          ${formatoIcone(ponto.formato)} <b>${ponto.numero}. ${ponto.nome}</b> — ${ativo.codigo}
+        </label>
+      `).join('')}
+    </div>
+
+    ${plButton(editingRota?'Salvar alterações':'Confirmar rota','saveRotaBtn','primary')}
+    ${plButton('Cancelar','cancelRotaBtn','ghost')}
+  `);
+}
+
+function capturarCamposRota(){
+  if(!rotaFormDraft) return;
+  const g = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  if(g('rotaNome')!==undefined) rotaFormDraft.nome = g('rotaNome').trim();
+  if(g('rotaDescricao')!==undefined) rotaFormDraft.descricao = g('rotaDescricao').trim();
+  if(g('rotaArea')!==undefined) rotaFormDraft.area = g('rotaArea').trim();
+  if(g('rotaSetor')!==undefined) rotaFormDraft.setor = g('rotaSetor').trim();
+  if(g('rotaTempoPrevisto')!==undefined) rotaFormDraft.tempoPrevisto = g('rotaTempoPrevisto');
+  if(g('rotaResponsavel')!==undefined) rotaFormDraft.responsavelUserId = g('rotaResponsavel');
+  const chkEls = document.querySelectorAll('.rotaPontoChk');
+  if(chkEls.length>0) rotaFormDraft.pontosIds = Array.from(chkEls).filter(el=>el.checked).map(el=>el.value);
+}
+
+function attachPlanoLubRotasEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('rotaSearchInput');
+  if(s) s.oninput = ()=>{
+    rotaSearch = s.value; renderView();
+    const el = document.getElementById('rotaSearchInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  const newBtn = document.getElementById('newRotaBtn');
+  if(newBtn) newBtn.onclick = ()=>{ editingRota=null; rotaFormDraft=null; showRotaForm=true; renderView(); };
+
+  attachPlMenuEvents((acao, btn)=>{
+    const id = btn.closest('.pl-menu-drop').id.replace('menu-rota-','');
+    const r = DB.rotas.find(x=>x.id===id);
+    if(!r) return;
+    if(acao==='editar'){ editingRota=r; rotaFormDraft=null; showRotaForm=true; renderView(); }
+    else if(acao==='excluir'){ excluirRota(id); }
+  });
+
+  if(showRotaForm) attachRotaFormEvents();
+}
+
+function attachRotaFormEvents(){
+  const closeX = document.querySelector('#rotaOverlay .plModalClose');
+  if(closeX) closeX.onclick = ()=>{ showRotaForm=false; rotaFormDraft=null; editingRota=null; renderView(); };
+  const cancelBtn = document.getElementById('cancelRotaBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{ showRotaForm=false; rotaFormDraft=null; editingRota=null; renderView(); };
+
+  const criterioSelect = document.getElementById('rotaCriterio');
+  if(criterioSelect) criterioSelect.onchange = ()=>{
+    capturarCamposRota();
+    rotaFormDraft.criterio = criterioSelect.value;
+    rotaFormDraft.criterioValor = '';
+    if(rotaFormDraft.criterio!=='manual') rotaFormDraft.pontosIds = [];
+    renderView();
+  };
+
+  const valorSelect = document.getElementById('rotaCriterioValor');
+  if(valorSelect) valorSelect.onchange = valorSelect.oninput = ()=>{
+    capturarCamposRota();
+    rotaFormDraft.criterioValor = valorSelect.value;
+    rotaFormDraft.pontosIds = candidatosRota(rotaFormDraft.criterio, rotaFormDraft.criterioValor).map(x=>x.ponto.id);
+    renderView();
+  };
+
+  const saveBtn = document.getElementById('saveRotaBtn');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    capturarCamposRota();
+    if(!rotaFormDraft.nome){ toast('Preencha o nome da rota'); return; }
+    if(rotaFormDraft.pontosIds.length===0){ toast('Selecione pelo menos um ponto'); return; }
+
+    if(editingRota){
+      Object.assign(editingRota, rotaFormDraft);
+    } else {
+      DB.rotas.push({id:uid(), codigo:proximoCodigoRota(), ...rotaFormDraft, status:'Ativa', ativo:true, dataCadastro:new Date().toISOString()});
+    }
+    await saveAll(KEYS.rotas, DB.rotas);
+    showRotaForm=false; rotaFormDraft=null; editingRota=null;
+    toast('Rota salva'); renderView();
+  };
+}
+
+async function excluirRota(id){
+  if(!confirm('Excluir esta rota definitivamente?')) return;
+  DB.rotas = DB.rotas.filter(r=>r.id!==id);
+  await saveAll(KEYS.rotas, DB.rotas);
+  toast('Rota excluída'); renderView();
+}
+
+/* ============ FASE 11 — MODO CAMPO (execução das rotas) ============ */
+let execucaoHistoricoId = null;
+let execucaoPontoIndex = 0;
+let execucaoRespostas = {}; // itemId -> {resposta, motivo, descricaoMotivo}
+let pendingFotoExecucao = {equipamento:'', ponto:''};
+let execucaoObservacoes = '';
+let execucaoQuantidade = '';
+let execucaoFerramenta = '';
+let execucaoLubrificanteId = '';
+
+function findPontoContext(pontoId){
+  for(const a of DB.ativos){
+    const p = (a.pontosLubrificacao||[]).find(x=>x.id===pontoId);
+    if(p) return {ponto:p, ativo:a};
+  }
+  return null;
+}
+function findPlanoDoPonto(pontoId){
+  return DB.planos.find(p=>p.ativo!==false && (p.pontosIds||[]).includes(pontoId));
+}
+
+function planoLubExecucaoView(){
+  if(execucaoHistoricoId) return execucaoPontoFormView();
+
+  const isAdmin = isAdminLevel();
+  const emAndamento = DB.historicoLub.filter(h=>h.status==='Em andamento');
+  let html = plSectionHeader('▶️ Execução — Modo Campo', plButton('← Voltar','voltarSecaoBtn','ghost'));
+
+  if(emAndamento.length>0){
+    html += `<h2 class="section-title" style="font-size:15px">Rotas em andamento</h2>`;
+    emAndamento.forEach(h=>{
+      const rota = DB.rotas.find(r=>r.id===h.rotaId);
+      html += plCard(`
+        <div class="row1"><b>${h.rotaCodigo}</b>${plBadge('em andamento','warn')}</div>
+        <div class="desc">${rota?rota.nome:'(rota removida)'}</div>
+        <div class="meta"><span>${(h.execucoesPontos||[]).length} de ${(rota?.pontosIds||[]).length} pontos feitos</span><span></span></div>
+        <button class="btn btn-primary btn-sm continuarExecucaoBtn" data-id="${h.id}" style="margin-top:8px">Continuar execução</button>
+      `);
+    });
+  }
+
+  html += `<h2 class="section-title" style="font-size:15px;margin-top:16px">Iniciar nova execução</h2>`;
+  const rotas = DB.rotas.filter(r=>r.ativo!==false);
+  if(rotas.length===0){ html += plEmpty('🗺️','Nenhuma rota cadastrada — crie uma em Rotas primeiro.'); }
+  rotas.forEach(r=>{
+    html += plCard(`
+      <div class="row1"><b>${r.codigo}</b>${plBadge((r.pontosIds||[]).length+' pontos','neutral')}</div>
+      <div class="desc">${r.nome}</div>
+      <div class="meta"><span>${r.area||r.setor||'—'}</span><span>${r.tempoPrevisto?r.tempoPrevisto+' min previstos':''}</span></div>
+      <button class="btn btn-amber btn-sm iniciarExecucaoBtn" data-id="${r.id}" style="margin-top:8px">▶️ Iniciar rota</button>
+    `);
+  });
+  return html;
+}
+
+function attachPlanoLubExecucaoEvents(){
+  if(execucaoHistoricoId){ attachExecucaoPontoFormEvents(); return; }
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  document.querySelectorAll('.iniciarExecucaoBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      const rota = DB.rotas.find(r=>r.id===b.dataset.id);
+      const hist = {
+        id:uid(), rotaId:rota.id, rotaCodigo:rota.codigo, dataInicio:new Date().toISOString(), dataFim:'',
+        usuarioId:currentUser.id, usuarioNome:currentUser.nome, status:'Em andamento', execucoesPontos:[]
+      };
+      DB.historicoLub.push(hist);
+      await saveAll(KEYS.historicoLub, DB.historicoLub);
+      execucaoHistoricoId = hist.id; execucaoPontoIndex = 0;
+      prepararCapturaPonto();
+      renderView();
+    };
+  });
+
+  document.querySelectorAll('.continuarExecucaoBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const hist = DB.historicoLub.find(h=>h.id===b.dataset.id);
+      execucaoHistoricoId = hist.id;
+      execucaoPontoIndex = (hist.execucoesPontos||[]).length;
+      prepararCapturaPonto();
+      renderView();
+    };
+  });
+}
+
+function prepararCapturaPonto(){
+  const hist = DB.historicoLub.find(h=>h.id===execucaoHistoricoId);
+  const rota = DB.rotas.find(r=>r.id===hist.rotaId);
+  const pontoId = (rota.pontosIds||[])[execucaoPontoIndex];
+  if(!pontoId) return;
+  const ctx = findPontoContext(pontoId);
+  execucaoRespostas = {};
+  pendingFotoExecucao = {equipamento:'', ponto:''};
+  execucaoObservacoes = '';
+  execucaoQuantidade = ctx?.ponto?.quantidade || '';
+  execucaoFerramenta = ctx?.ponto?.ferramenta || '';
+  execucaoLubrificanteId = ctx?.ponto?.lubrificanteProdutoId || '';
+}
+
+function execucaoPontoFormView(){
+  const hist = DB.historicoLub.find(h=>h.id===execucaoHistoricoId);
+  const rota = DB.rotas.find(r=>r.id===hist.rotaId);
+  const pontosIds = rota.pontosIds||[];
+  const pontoId = pontosIds[execucaoPontoIndex];
+
+  if(!pontoId) return telaFinalizarRota(hist, rota);
+
+  const ctx = findPontoContext(pontoId);
+  if(!ctx){
+    execucaoPontoIndex++;
+    return plEmpty('⚠️','Ponto não encontrado — pulando para o próximo.');
+  }
+  const {ponto, ativo} = ctx;
+  const plano = findPlanoDoPonto(pontoId);
+  const procedimento = plano ? DB.procedimentos.find(p=>p.id===plano.procedimentoId) : null;
+  const checklist = plano ? DB.checklists.find(c=>c.id===plano.checklistId) : null;
+
+  let html = plSectionHeader(`Ponto ${execucaoPontoIndex+1} de ${pontosIds.length}`, plBadge(rota.codigo,'info'));
+  html += `<div class="tabs-wrap">${pontosIds.map((_,i)=>plBadge(String(i+1), i===execucaoPontoIndex?'info':(i<execucaoPontoIndex?'ok':'neutral'))).join('')}</div>`;
+
+  html += plCard(`
+    <div class="row1"><b>${formatoIcone(ponto.formato)} ${ponto.numero}. ${ponto.nome}</b></div>
+    <div class="meta"><span>${ativo.codigo} — ${ativo.nome}</span><span></span></div>
+    ${ponto.descricao?`<div class="note">${ponto.descricao}</div>`:''}
+  `, 'var(--steel)');
+
+  if(procedimento){
+    html += plCard(`<b>📋 Procedimento: ${procedimento.nome}</b><div class="pl-editor-area" style="margin-top:6px;max-height:140px">${procedimento.descricaoHtml||''}</div>`);
+  }
+
+  html += `<label>Foto do equipamento</label>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+    ${pendingFotoExecucao.equipamento?`<img src="${pendingFotoExecucao.equipamento}" style="width:56px;height:56px;object-fit:cover;border-radius:8px">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+    <input type="file" accept="image/*" id="execFotoEquip" style="flex:1">
+  </div>
+  <label>Foto do ponto</label>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+    ${pendingFotoExecucao.ponto?`<img src="${pendingFotoExecucao.ponto}" style="width:56px;height:56px;object-fit:cover;border-radius:8px">`:`<div style="width:56px;height:56px;border-radius:8px;background:var(--paper-2);display:flex;align-items:center;justify-content:center;color:var(--muted)">${ICONS.camera}</div>`}
+    <input type="file" accept="image/*" id="execFotoPonto" style="flex:1">
+  </div>`;
+
+  const lubrificantes = DB.produtosLub.filter(x=>x.ativo!==false);
+  html += plFormGroup('Lubrificante utilizado', `<select id="execLubrificante"><option value="">Nenhum</option>${lubrificantes.map(l=>`<option value="${l.id}" ${execucaoLubrificanteId===l.id?'selected':''}>${l.codigo} — ${l.descricao}</option>`).join('')}</select>`);
+  html += `<div class="row-2">
+    <div>${plFormGroup('Quantidade', `<input id="execQuantidade" type="number" step="0.01" value="${execucaoQuantidade}">`)}</div>
+    <div>${plFormGroup('Ferramenta', `<input id="execFerramenta" value="${execucaoFerramenta}">`)}</div>
+  </div>`;
+
+  if(checklist){
+    html += `<h2 class="section-title" style="font-size:15px;margin-top:16px">✅ Checklist — ${checklist.nome}</h2>`;
+    (checklist.itens||[]).forEach(item=>{
+      const resp = execucaoRespostas[item.id] || {};
+      html += `<div class="card" style="padding:10px" data-item-id="${item.id}">
+        <div class="row1"><b style="font-size:13px">${item.texto}</b>${item.obrigatorio?plBadge('obrigatório','warn'):''}</div>
+        <div style="margin-top:8px">${renderRespostaItem(item, resp)}</div>
+      </div>`;
+    });
+  }
+
+  html += plFormGroup('Observações', `<textarea id="execObservacoes" rows="2">${execucaoObservacoes}</textarea>`);
+
+  html += `<div class="row-2" style="margin-top:16px">
+    ${plButton('Cancelar execução','cancelExecucaoBtn','ghost')}
+    ${plButton(execucaoPontoIndex<pontosIds.length-1?'Concluir ponto → Próximo':'Concluir último ponto','concluirPontoBtn','primary')}
+  </div>`;
+  return html;
+}
+
+function renderRespostaItem(item, resp){
+  if(item.tipo==='Conforme/Não Conforme'){
+    return `<div class="row-2">
+      <button type="button" class="btn ${resp.resposta==='Conforme'?'btn-primary':'btn-ghost'} btn-sm respItemBtn" data-item="${item.id}" data-valor="Conforme">Conforme</button>
+      <button type="button" class="btn ${resp.resposta==='Não Conforme'?'btn-danger':'btn-ghost'} btn-sm respItemBtn" data-item="${item.id}" data-valor="Não Conforme">Não Conforme</button>
+    </div>`;
+  }
+  if(item.tipo==='Realizado/Não Realizado'){
+    let html = `<div class="row-2">
+      <button type="button" class="btn ${resp.resposta==='Realizado'?'btn-primary':'btn-ghost'} btn-sm respItemBtn" data-item="${item.id}" data-valor="Realizado">Realizado</button>
+      <button type="button" class="btn ${resp.resposta==='Não Realizado'?'btn-danger':'btn-ghost'} btn-sm respItemBtn" data-item="${item.id}" data-valor="Não Realizado">Não Realizado</button>
+    </div>`;
+    if(resp.resposta==='Não Realizado'){
+      html += `<label style="margin-top:8px">Motivo</label>
+      <select class="respMotivoSelect" data-item="${item.id}">
+        <option value="">Selecione...</option>
+        ${MOTIVOS_NAO_REALIZADO.map(m=>`<option value="${m}" ${resp.motivo===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+      <label>Descrição (obrigatória)</label>
+      <input class="respDescricaoMotivo" data-item="${item.id}" value="${resp.descricaoMotivo||''}" placeholder="Detalhe o motivo">`;
+    }
+    return html;
+  }
+  if(item.tipo==='Texto') return `<input class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}">`;
+  if(item.tipo==='Texto longo') return `<textarea class="respItemInput" data-item="${item.id}" rows="2">${resp.resposta||''}</textarea>`;
+  if(item.tipo==='Número') return `<input type="number" class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}">`;
+  if(item.tipo==='Data') return `<input type="date" class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}">`;
+  if(item.tipo==='Hora') return `<input type="time" class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}">`;
+  if(item.tipo==='Foto') return `<input type="file" accept="image/*" class="respItemFoto" data-item="${item.id}">${resp.resposta?`<img src="${resp.resposta}" style="width:50px;height:50px;object-fit:cover;border-radius:6px;margin-top:6px">`:''}`;
+  if(['Vídeo','Áudio','Assinatura','Arquivo'].includes(item.tipo)) return `<input class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}" placeholder="Referência/nome do anexo (${item.tipo})">`;
+  if(['QR Code','Código de barras'].includes(item.tipo)) return `<input class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}" placeholder="Código lido/digitado">`;
+  return `<input class="respItemInput" data-item="${item.id}" value="${resp.resposta||''}">`;
+}
+
+function attachExecucaoPontoFormEvents(){
+  const hist = DB.historicoLub.find(h=>h.id===execucaoHistoricoId);
+  if(!hist) return;
+  const rota = DB.rotas.find(r=>r.id===hist.rotaId);
+  const pontosIds = rota ? (rota.pontosIds||[]) : [];
+
+  if(!pontosIds[execucaoPontoIndex]){ attachFinalizarRotaEvents(hist, rota); return; }
+
+  function capturarCampos(){
+    const g = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+    if(g('execLubrificante')!==undefined) execucaoLubrificanteId = g('execLubrificante');
+    if(g('execQuantidade')!==undefined) execucaoQuantidade = g('execQuantidade');
+    if(g('execFerramenta')!==undefined) execucaoFerramenta = g('execFerramenta');
+    if(g('execObservacoes')!==undefined) execucaoObservacoes = g('execObservacoes');
+    document.querySelectorAll('.respItemInput').forEach(el=>{
+      const id = el.dataset.item;
+      execucaoRespostas[id] = {...(execucaoRespostas[id]||{}), resposta: el.value};
+    });
+  }
+
+  function wireExecFoto(inputId, campo){
+    const el = document.getElementById(inputId);
+    if(!el) return;
+    el.onchange = (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const maxSize=360; let w=img.width,h=img.height;
+          if(w>h && w>maxSize){h=h*(maxSize/w);w=maxSize;} else if(h>=w && h>maxSize){w=w*(maxSize/h);h=maxSize;}
+          const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          pendingFotoExecucao[campo] = canvas.toDataURL('image/jpeg',0.7);
+          capturarCampos(); renderView();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+  wireExecFoto('execFotoEquip','equipamento');
+  wireExecFoto('execFotoPonto','ponto');
+
+  document.querySelectorAll('.respItemFoto').forEach(inp=>{
+    inp.onchange = (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      const id = inp.dataset.item;
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const maxSize=300; let w=img.width,h=img.height;
+          if(w>h && w>maxSize){h=h*(maxSize/w);w=maxSize;} else if(h>=w && h>maxSize){w=w*(maxSize/h);h=maxSize;}
+          const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          execucaoRespostas[id] = {...(execucaoRespostas[id]||{}), resposta: canvas.toDataURL('image/jpeg',0.7)};
+          capturarCampos(); renderView();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+  });
+
+  document.querySelectorAll('.respItemBtn').forEach(b=>{
+    b.onclick = ()=>{
+      capturarCampos();
+      const id = b.dataset.item;
+      execucaoRespostas[id] = {...(execucaoRespostas[id]||{}), resposta: b.dataset.valor};
+      renderView();
+    };
+  });
+  document.querySelectorAll('.respMotivoSelect').forEach(sel=>{
+    sel.onchange = ()=>{ capturarCampos(); const id=sel.dataset.item; execucaoRespostas[id] = {...(execucaoRespostas[id]||{}), motivo: sel.value}; renderView(); };
+  });
+  document.querySelectorAll('.respDescricaoMotivo').forEach(inp=>{
+    inp.oninput = ()=>{ const id=inp.dataset.item; execucaoRespostas[id] = {...(execucaoRespostas[id]||{}), descricaoMotivo: inp.value}; };
+  });
+
+  const cancelBtn = document.getElementById('cancelExecucaoBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=>{
+    if(!confirm('Cancelar a execução? O progresso feito até agora fica salvo e pode ser retomado depois.')) return;
+    execucaoHistoricoId = null; execucaoPontoIndex = 0; planoLubSecaoAtiva=null; renderView();
+  };
+
+  const concluirBtn = document.getElementById('concluirPontoBtn');
+  if(concluirBtn) concluirBtn.onclick = async ()=>{
+    capturarCampos();
+    const checklist = (()=>{ const plano = findPlanoDoPonto(pontosIds[execucaoPontoIndex]); return plano ? DB.checklists.find(c=>c.id===plano.checklistId) : null; })();
+    if(checklist){
+      for(const item of (checklist.itens||[])){
+        const r = execucaoRespostas[item.id] || {};
+        if(item.obrigatorio && !r.resposta){ toast(`Preencha o item obrigatório: "${item.texto}"`); return; }
+        if(r.resposta==='Não Realizado' && (!r.motivo || !r.descricaoMotivo)){ toast('Informe o motivo e a descrição do item não realizado'); return; }
+      }
+    }
+    const ctx = findPontoContext(pontosIds[execucaoPontoIndex]);
+    const checklistRespostas = checklist ? (checklist.itens||[]).map(item=>({itemId:item.id, itemTexto:item.texto, tipo:item.tipo, ...( execucaoRespostas[item.id]||{} )})) : [];
+    hist.execucoesPontos.push({
+      pontoId: ctx.ponto.id, ativoId: ctx.ativo.id, ativoCodigo: ctx.ativo.codigo, ativoNome: ctx.ativo.nome,
+      pontoNumero: ctx.ponto.numero, pontoNome: ctx.ponto.nome,
+      fotoEquipamento: pendingFotoExecucao.equipamento, fotoPonto: pendingFotoExecucao.ponto,
+      lubrificanteProdutoId: execucaoLubrificanteId, quantidade: execucaoQuantidade, ferramenta: execucaoFerramenta,
+      checklistRespostas, observacoes: execucaoObservacoes, dataHora: new Date().toISOString()
+    });
+    await saveAll(KEYS.historicoLub, DB.historicoLub);
+    execucaoPontoIndex++;
+    prepararCapturaPonto();
+    renderView();
+  };
+}
+
+function telaFinalizarRota(hist, rota){
+  let html = plSectionHeader('✓ Rota concluída', plBadge(hist.rotaCodigo,'info'));
+  html += plCard(`
+    <div class="meta"><span>Rota</span><span><b>${rota?rota.nome:'—'}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Pontos executados</span><span><b>${hist.execucoesPontos.length}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Início</span><span><b>${new Date(hist.dataInicio).toLocaleString('pt-BR')}</b></span></div>
+  `, 'var(--moss)');
+  html += `<div class="row-2" style="margin-top:16px">${plButton('✓ Finalizar rota','finalizarRotaBtn','primary')}</div>`;
+  return html;
+}
+
+function attachFinalizarRotaEvents(hist, rota){
+  const btn = document.getElementById('finalizarRotaBtn');
+  if(btn) btn.onclick = async ()=>{
+    hist.status = 'Concluída';
+    hist.dataFim = new Date().toISOString();
+    hist.tempoTotalMin = Math.round((new Date(hist.dataFim) - new Date(hist.dataInicio))/60000);
+    await saveAll(KEYS.historicoLub, DB.historicoLub);
+    execucaoHistoricoId = null; execucaoPontoIndex = 0; planoLubSecaoAtiva=null;
+    toast('Rota finalizada e salva no histórico'); renderView();
+  };
 }
 
 
