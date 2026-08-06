@@ -721,6 +721,8 @@ function resetModuleUiState(){
   rotaSearch=''; editingRota=null; showRotaForm=false; rotaFormDraft=null;
   execucaoHistoricoId=null; execucaoPontoIndex=0; execucaoRespostas={}; pendingFotoExecucao={equipamento:'',ponto:''};
   execucaoObservacoes=''; execucaoQuantidade=''; execucaoFerramenta=''; execucaoLubrificanteId='';
+  historicoLubBusca=''; historicoLubDetalheId=null;
+  indPlanoModo='mes';
   planoLubMapaAtivoId=null; planoLubModoAdicionar=false; planoLubModoVisualizacao=false; planoLubZoom=1;
   planoLubPontoAtivo=null; showPontoForm=false; pontoFormDraft=null; pendingFotoPonto={geral:'',aproximada:'',detalhada:''};
 }
@@ -1098,6 +1100,8 @@ function planoLubModulosView(){
   if(planoLubSecaoAtiva==='planos') return planoLubPlanosView();
   if(planoLubSecaoAtiva==='rotas') return planoLubRotasView();
   if(planoLubSecaoAtiva==='execucao') return planoLubExecucaoView();
+  if(planoLubSecaoAtiva==='historico') return planoLubHistoricoView();
+  if(planoLubSecaoAtiva==='indicadores') return planoLubIndicadoresView();
   if(planoLubSecaoAtiva){
     const s = SECOES_PLANOLUB.find(x=>x.id===planoLubSecaoAtiva);
     let html = plSectionHeader(`${s.icone} ${s.nome}`, plButton('← Voltar','voltarSecaoBtn','ghost'));
@@ -1111,7 +1115,7 @@ function planoLubModulosView(){
       <div class="row1" style="align-items:center">
         <div class="desc" style="font-size:15px;cursor:pointer" data-id="${s.id}">${s.icone} ${s.nome}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          ${plBadge(['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao'].includes(s.id)?'ok':'warn')}
+          ${plBadge(['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'ok':'warn')}
           ${plMenu('sec-'+s.id, [{acao:'abrir',texto:'Abrir seção'},{acao:'info',texto:'Sobre esta seção'}])}
         </div>
       </div>
@@ -1130,6 +1134,8 @@ function attachPlanoLubModulosEvents(){
   if(planoLubSecaoAtiva==='planos'){ attachPlanoLubPlanosEvents(); return; }
   if(planoLubSecaoAtiva==='rotas'){ attachPlanoLubRotasEvents(); return; }
   if(planoLubSecaoAtiva==='execucao'){ attachPlanoLubExecucaoEvents(); return; }
+  if(planoLubSecaoAtiva==='historico'){ attachPlanoLubHistoricoEvents(); return; }
+  if(planoLubSecaoAtiva==='indicadores'){ attachPlanoLubIndicadoresEvents(); return; }
   const voltarBtn = document.getElementById('voltarSecaoBtn');
   if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
 
@@ -2221,8 +2227,8 @@ function execucaoPontoFormView(){
   }
   const {ponto, ativo} = ctx;
   const plano = findPlanoDoPonto(pontoId);
-  const procedimento = plano ? DB.procedimentos.find(p=>p.id===plano.procedimentoId) : null;
-  const checklist = plano ? DB.checklists.find(c=>c.id===plano.checklistId) : null;
+  const procedimento = DB.procedimentos.find(p=>p.id===(ponto.procedimentoId || (plano?plano.procedimentoId:'')));
+  const checklist = DB.checklists.find(c=>c.id===(ponto.checklistId || (plano?plano.checklistId:'')));
 
   let html = plSectionHeader(`Ponto ${execucaoPontoIndex+1} de ${pontosIds.length}`, plBadge(rota.codigo,'info'));
   html += `<div class="tabs-wrap">${pontosIds.map((_,i)=>plBadge(String(i+1), i===execucaoPontoIndex?'info':(i<execucaoPontoIndex?'ok':'neutral'))).join('')}</div>`;
@@ -2398,7 +2404,7 @@ function attachExecucaoPontoFormEvents(){
   const concluirBtn = document.getElementById('concluirPontoBtn');
   if(concluirBtn) concluirBtn.onclick = async ()=>{
     capturarCampos();
-    const checklist = (()=>{ const plano = findPlanoDoPonto(pontosIds[execucaoPontoIndex]); return plano ? DB.checklists.find(c=>c.id===plano.checklistId) : null; })();
+    const checklist = (()=>{ const ctx = findPontoContext(pontosIds[execucaoPontoIndex]); const plano = findPlanoDoPonto(pontosIds[execucaoPontoIndex]); return DB.checklists.find(c=>c.id===(ctx?.ponto?.checklistId || (plano?plano.checklistId:''))); })();
     if(checklist){
       for(const item of (checklist.itens||[])){
         const r = execucaoRespostas[item.id] || {};
@@ -2442,6 +2448,230 @@ function attachFinalizarRotaEvents(hist, rota){
     await saveAll(KEYS.historicoLub, DB.historicoLub);
     execucaoHistoricoId = null; execucaoPontoIndex = 0; planoLubSecaoAtiva=null;
     toast('Rota finalizada e salva no histórico'); renderView();
+  };
+}
+
+/* ============ FASE 12 — HISTÓRICO E GERAÇÃO DE PDF ============ */
+let historicoLubBusca = '';
+let historicoLubDetalheId = null;
+
+function planoLubHistoricoView(){
+  if(historicoLubDetalheId) return historicoLubDetalheView();
+
+  const termo = historicoLubBusca.toLowerCase();
+  const lista = DB.historicoLub.filter(h=>h.status==='Concluída').filter(h=>
+    (h.rotaCodigo||'').toLowerCase().includes(termo) || (h.usuarioNome||'').toLowerCase().includes(termo)
+  ).slice().reverse();
+
+  let html = plSectionHeader('🗂️ Histórico', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="note" style="margin-bottom:10px">Cada execução de rota gera um novo registro aqui — nada é substituído ou sobrescrito.</div>`;
+  html += `<input id="histLubBuscaInput" placeholder="Buscar por rota ou técnico" value="${historicoLubBusca}" style="margin-bottom:12px">`;
+
+  if(lista.length===0){ html += plEmpty('🗂️','Nenhuma execução concluída ainda.'); return html; }
+  lista.forEach(h=>{
+    const rota = DB.rotas.find(r=>r.id===h.rotaId);
+    const naoRealizados = (h.execucoesPontos||[]).reduce((s,ep)=>s+(ep.checklistRespostas||[]).filter(r=>r.resposta==='Não Realizado').length,0);
+    html += plCard(`
+      <div class="row1" style="align-items:center">
+        <span class="codigo">${h.rotaCodigo}</span>
+        ${naoRealizados>0?plBadge(naoRealizados+' pendência'+(naoRealizados>1?'s':''),'danger'):plBadge('sem pendências','ok')}
+      </div>
+      <div class="desc">${rota?rota.nome:'(rota removida)'}</div>
+      <div class="meta"><span>${h.usuarioNome}</span><span>${new Date(h.dataInicio).toLocaleDateString('pt-BR')}</span></div>
+      <div class="meta" style="margin-top:2px"><span>${(h.execucoesPontos||[]).length} pontos</span><span>${h.tempoTotalMin||0} min</span></div>
+      <div class="row-2" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm verDetalheHistBtn" data-id="${h.id}">Ver detalhes</button>
+        <button class="btn btn-outline btn-sm gerarPdfHistBtn" data-id="${h.id}">📄 Gerar PDF</button>
+      </div>
+    `);
+  });
+  return html;
+}
+
+function historicoLubDetalheView(){
+  const h = DB.historicoLub.find(x=>x.id===historicoLubDetalheId);
+  if(!h) return plEmpty('⚠️','Registro não encontrado.');
+  const rota = DB.rotas.find(r=>r.id===h.rotaId);
+
+  let html = plSectionHeader(`🗂️ ${h.rotaCodigo}`, plButton('← Voltar','voltarDetalheHistBtn','ghost'));
+  html += plCard(`
+    <div class="meta"><span>Rota</span><span><b>${rota?rota.nome:'—'}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Técnico</span><span><b>${h.usuarioNome}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Início</span><span><b>${new Date(h.dataInicio).toLocaleString('pt-BR')}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Fim</span><span><b>${h.dataFim?new Date(h.dataFim).toLocaleString('pt-BR'):'—'}</b></span></div>
+    <div class="meta" style="margin-top:6px"><span>Tempo total</span><span><b>${h.tempoTotalMin||0} min</b></span></div>
+  `);
+  html += plButton('📄 Gerar PDF desta execução','gerarPdfDetalheBtn','primary');
+
+  html += `<h2 class="section-title" style="font-size:15px;margin-top:16px">Pontos executados</h2>`;
+  (h.execucoesPontos||[]).forEach(ep=>{
+    const lub = DB.produtosLub.find(p=>p.id===ep.lubrificanteProdutoId);
+    html += plCard(`
+      <div class="row1"><b>${ep.pontoNumero}. ${ep.pontoNome}</b></div>
+      <div class="meta"><span>${ep.ativoCodigo} — ${ep.ativoNome}</span><span>${new Date(ep.dataHora).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span></div>
+      ${lub?`<div class="note">Lubrificante: ${lub.descricao} — ${ep.quantidade||''} ${lub.unidade||''}</div>`:''}
+      ${ep.ferramenta?`<div class="note">Ferramenta: ${ep.ferramenta}</div>`:''}
+      ${(ep.fotoEquipamento||ep.fotoPonto)?`<div style="display:flex;gap:8px;margin-top:6px">
+        ${ep.fotoEquipamento?`<img src="${ep.fotoEquipamento}" style="width:50px;height:50px;object-fit:cover;border-radius:6px">`:''}
+        ${ep.fotoPonto?`<img src="${ep.fotoPonto}" style="width:50px;height:50px;object-fit:cover;border-radius:6px">`:''}
+      </div>`:''}
+      ${(ep.checklistRespostas||[]).length>0?`<div class="note" style="margin-top:6px"><b>Checklist:</b><br>${ep.checklistRespostas.map(r=>`${r.itemTexto}: ${r.resposta||'—'}${r.resposta==='Não Realizado'?' ('+r.motivo+(r.descricaoMotivo?' — '+r.descricaoMotivo:'')+')':''}`).join('<br>')}</div>`:''}
+      ${ep.observacoes?`<div class="note" style="margin-top:4px">Obs: ${ep.observacoes}</div>`:''}
+    `);
+  });
+  return html;
+}
+
+function attachPlanoLubHistoricoEvents(){
+  if(historicoLubDetalheId){
+    const voltarD = document.getElementById('voltarDetalheHistBtn');
+    if(voltarD) voltarD.onclick = ()=>{ historicoLubDetalheId=null; renderView(); };
+    const pdfBtn = document.getElementById('gerarPdfDetalheBtn');
+    if(pdfBtn) pdfBtn.onclick = ()=>gerarPdfExecucao(historicoLubDetalheId);
+    return;
+  }
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+
+  const s = document.getElementById('histLubBuscaInput');
+  if(s) s.oninput = ()=>{
+    historicoLubBusca = s.value; renderView();
+    const el = document.getElementById('histLubBuscaInput');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  };
+
+  document.querySelectorAll('.verDetalheHistBtn').forEach(b=>{
+    b.onclick = ()=>{ historicoLubDetalheId=b.dataset.id; renderView(); };
+  });
+  document.querySelectorAll('.gerarPdfHistBtn').forEach(b=>{
+    b.onclick = ()=>gerarPdfExecucao(b.dataset.id);
+  });
+}
+
+function gerarPdfExecucao(historicoId){
+  if(!window.jspdf){ toast('Biblioteca de PDF não carregou. Verifique sua conexão.'); return; }
+  const h = DB.historicoLub.find(x=>x.id===historicoId);
+  if(!h) return;
+  const rota = DB.rotas.find(r=>r.id===h.rotaId);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 16;
+
+  doc.setFontSize(17); doc.setFont(undefined,'bold'); doc.text('ERTEL LUBRIFICAÇÃO', 14, y); doc.setFont(undefined,'normal');
+  doc.setFontSize(11); doc.text('Ordem de Serviço — Execução de Rota', 14, y+7);
+  doc.setFontSize(9); doc.text(`Rota: ${h.rotaCodigo}`, 150, y);
+  y += 16; doc.line(14, y, 196, y); y += 8;
+
+  doc.setFontSize(10);
+  const linha = (label, valor)=>{ doc.setFont(undefined,'bold'); doc.text(label+':', 14, y); doc.setFont(undefined,'normal'); doc.text(String(valor||'—'), 55, y); y+=6; };
+  linha('Rota', rota?rota.nome:'—');
+  linha('Área/Setor', rota?(rota.area||rota.setor||'—'):'—');
+  linha('Técnico responsável', h.usuarioNome);
+  linha('Início', new Date(h.dataInicio).toLocaleString('pt-BR'));
+  linha('Término', h.dataFim?new Date(h.dataFim).toLocaleString('pt-BR'):'—');
+  linha('Tempo total', (h.tempoTotalMin||0)+' minutos');
+  linha('Pontos executados', (h.execucoesPontos||[]).length);
+
+  y += 4; doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.text('Pontos e Consumo', 14, y); doc.setFont(undefined,'normal'); doc.setFontSize(9); y += 7;
+  doc.text('Ponto', 14, y); doc.text('Equipamento', 60, y); doc.text('Lubrificante', 115, y); doc.text('Qtd', 165, y);
+  y += 4; doc.line(14, y, 196, y); y += 5;
+  let pendencias = [];
+  (h.execucoesPontos||[]).forEach(ep=>{
+    if(y>275){ doc.addPage(); y=16; }
+    const lub = DB.produtosLub.find(p=>p.id===ep.lubrificanteProdutoId);
+    doc.text(`${ep.pontoNumero}. ${String(ep.pontoNome||'').slice(0,20)}`, 14, y);
+    doc.text(String(ep.ativoCodigo||'').slice(0,20), 60, y);
+    doc.text(lub?String(lub.descricao).slice(0,20):'—', 115, y);
+    doc.text(String(ep.quantidade||'—'), 165, y);
+    y += 6;
+    (ep.checklistRespostas||[]).forEach(r=>{
+      if(r.resposta==='Não Realizado') pendencias.push(`${ep.pontoNumero}. ${ep.pontoNome} — ${r.itemTexto}: ${r.motivo||''} ${r.descricaoMotivo?'('+r.descricaoMotivo+')':''}`);
+      if(r.resposta==='Não Conforme') pendencias.push(`${ep.pontoNumero}. ${ep.pontoNome} — ${r.itemTexto}: Não Conforme`);
+    });
+  });
+
+  if(pendencias.length>0){
+    y += 6; if(y>270){ doc.addPage(); y=16; }
+    doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.text('Pendências', 14, y); doc.setFont(undefined,'normal'); doc.setFontSize(9); y += 7;
+    pendencias.forEach(p=>{
+      if(y>280){ doc.addPage(); y=16; }
+      const texto = doc.splitTextToSize('• '+p, 180);
+      doc.text(texto, 14, y); y += 6*texto.length;
+    });
+  } else {
+    y += 8; doc.setFontSize(10); doc.text('Nenhuma pendência registrada nesta execução.', 14, y); y += 8;
+  }
+
+  y += 14; if(y>270){ doc.addPage(); y=16; }
+  doc.line(20, y, 90, y); doc.line(120, y, 190, y);
+  doc.setFontSize(9); doc.text('Assinatura do técnico', 30, y+5); doc.text('Assinatura do responsável', 130, y+5);
+
+  doc.save(`OS-${h.rotaCodigo}-${new Date(h.dataInicio).toISOString().slice(0,10)}.pdf`);
+}
+
+/* ============ FASE 13 — INDICADORES ============ */
+let indPlanoModo = 'mes';
+let indPlanoDataIni = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10);
+let indPlanoDataFim = new Date().toISOString().slice(0,10);
+
+function planoLubIndicadoresView(){
+  const ini = new Date(indPlanoDataIni+'T00:00:00'), fim = new Date(indPlanoDataFim+'T23:59:59');
+  const hoje = new Date();
+  const rotasAtivas = DB.rotas.filter(r=>r.ativo!==false);
+  const execsPeriodo = DB.historicoLub.filter(h=>{ const d=new Date(h.dataInicio); return d>=ini && d<=fim; });
+  const concluidas = execsPeriodo.filter(h=>h.status==='Concluída');
+  const emAndamento = DB.historicoLub.filter(h=>h.status==='Em andamento');
+  const rotasComExecucaoNoPeriodo = new Set(concluidas.map(h=>h.rotaId));
+  const rotasPendentes = rotasAtivas.filter(r=>!rotasComExecucaoNoPeriodo.has(r.id) && !emAndamento.some(h=>h.rotaId===r.id));
+
+  let consumoOleo=0, consumoGraxa=0, custoTotal=0;
+  const porEquip = {};
+  concluidas.forEach(h=>{
+    (h.execucoesPontos||[]).forEach(ep=>{
+      const lub = DB.produtosLub.find(p=>p.id===ep.lubrificanteProdutoId);
+      const qtd = parseFloat(ep.quantidade)||0;
+      if(lub){
+        if(['Óleo','Óleo Spray'].includes(lub.tipoLubrificante)) consumoOleo += qtd;
+        if(['Graxa','Graxa Spray'].includes(lub.tipoLubrificante)) consumoGraxa += qtd;
+        custoTotal += qtd*(lub.valorUnitario||0);
+      }
+      porEquip[ep.ativoNome] = (porEquip[ep.ativoNome]||0)+1;
+    });
+  });
+  const tempoMedio = concluidas.length>0 ? Math.round(concluidas.reduce((s,h)=>s+(h.tempoTotalMin||0),0)/concluidas.length) : 0;
+  const topEquip = Object.entries(porEquip).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([nome,valor])=>({nome,valor,unidade:'lubrificações'}));
+
+  let html = plSectionHeader('📊 Indicadores', plButton('← Voltar','voltarSecaoBtn','ghost'));
+  html += `<div class="row-2"><input type="date" id="indPlanoIniInput" value="${indPlanoDataIni}"><input type="date" id="indPlanoFimInput" value="${indPlanoDataFim}"></div>`;
+  html += plButton('Aplicar período','indPlanoAplicarBtn','primary');
+
+  html += plMetricsRow([
+    {valor:concluidas.length, rotulo:'Rotas executadas', tone:'ok'},
+    {valor:rotasPendentes.length, rotulo:'Rotas pendentes', tone:'amber'},
+    {valor:emAndamento.length, rotulo:'Rotas em andamento'},
+    {valor:tempoMedio, rotulo:'Tempo médio (min)'}
+  ]);
+  html += plMetricsRow([
+    {valor:Math.round(consumoOleo*100)/100, rotulo:'Óleo consumido (L)'},
+    {valor:Math.round(consumoGraxa*100)/100, rotulo:'Graxa consumida (kg)'},
+    {valor:money(custoTotal), rotulo:'Custo total do período'},
+    {valor:rotasAtivas.length, rotulo:'Rotas cadastradas'}
+  ]);
+
+  html += plSectionHeader('Equipamentos mais lubrificados no período');
+  html += plCard(topEquip.length>0 ? renderBarChart(topEquip) : `<div class="note">Sem execuções no período.</div>`);
+
+  return html;
+}
+
+function attachPlanoLubIndicadoresEvents(){
+  const voltarBtn = document.getElementById('voltarSecaoBtn');
+  if(voltarBtn) voltarBtn.onclick = ()=>{ planoLubSecaoAtiva=null; renderView(); };
+  const aplicarBtn = document.getElementById('indPlanoAplicarBtn');
+  if(aplicarBtn) aplicarBtn.onclick = ()=>{
+    indPlanoDataIni = document.getElementById('indPlanoIniInput').value || indPlanoDataIni;
+    indPlanoDataFim = document.getElementById('indPlanoFimInput').value || indPlanoDataFim;
+    renderView();
   };
 }
 
@@ -2581,9 +2811,9 @@ function pontoFormSheet(){
       <div>${plFormGroup('Quantidade', `<input id="ptQuantidade" type="number" step="0.01" value="${p.quantidade||''}">`)}</div>
       <div>${plFormGroup('Unidade', `<input id="ptUnidade" value="${p.unidade||''}" placeholder="Ex: ml, g">`)}</div>
     </div>
-    ${plFormGroup('Ferramenta', `<input id="ptFerramenta" value="${p.ferramenta||''}" placeholder="Ex: Engraxadeira manual">`, 'Biblioteca de ferramentas chega em fase futura — por enquanto, texto livre.')}
-    ${plFormGroup('Procedimento', `<input id="ptProcedimento" value="${p.procedimento||''}" placeholder="Ex: Limpar bico antes de aplicar">`, 'Biblioteca de procedimentos chega na Fase 7.')}
-    ${plFormGroup('Checklist', `<input id="ptChecklist" value="${p.checklist||''}" placeholder="Ex: Verificar vazamento">`, 'Biblioteca de checklists chega na Fase 8.')}
+    ${plFormGroup('Ferramenta', `<input id="ptFerramenta" value="${p.ferramenta||''}" placeholder="Ex: Engraxadeira manual">`, 'Biblioteca de ferramentas própria chega em fase futura — por enquanto, texto livre.')}
+    ${plFormGroup('Procedimento (opcional)', `<select id="ptProcedimentoId"><option value="">Nenhum — usa o do plano, se houver</option>${DB.procedimentos.filter(x=>x.ativo!==false).map(pr=>`<option value="${pr.id}" ${p.procedimentoId===pr.id?'selected':''}>${pr.codigo} — ${pr.nome}</option>`).join('')}</select>`, 'Da biblioteca de Procedimentos. Se não escolher, a execução usa o procedimento definido no plano deste ponto.')}
+    ${plFormGroup('Checklist (opcional)', `<select id="ptChecklistId"><option value="">Nenhum — usa o do plano, se houver</option>${DB.checklists.filter(x=>x.ativo!==false).map(c=>`<option value="${c.id}" ${p.checklistId===c.id?'selected':''}>${c.codigo} — ${c.nome}</option>`).join('')}</select>`, 'Da biblioteca de Checklists. Se não escolher, a execução usa o checklist definido no plano deste ponto.')}
     ${plFormGroup('Tempo padrão (minutos)', `<input id="ptTempoPadrao" type="number" value="${p.tempoPadrao||''}">`)}
     ${plFormGroup('Observações', `<textarea id="ptObservacoes" rows="2">${p.observacoes||''}</textarea>`)}
 
@@ -2730,8 +2960,8 @@ function attachPontoFormEvents(ativo){
       quantidade: document.getElementById('ptQuantidade').value,
       unidade: document.getElementById('ptUnidade').value.trim(),
       ferramenta: document.getElementById('ptFerramenta').value.trim(),
-      procedimento: document.getElementById('ptProcedimento').value.trim(),
-      checklist: document.getElementById('ptChecklist').value.trim(),
+      procedimentoId: document.getElementById('ptProcedimentoId').value,
+      checklistId: document.getElementById('ptChecklistId').value,
       tempoPadrao: document.getElementById('ptTempoPadrao').value,
       observacoes: document.getElementById('ptObservacoes').value.trim()
     };
@@ -2761,9 +2991,9 @@ async function excluirPonto(ativo, pontoId){
 
 function planoLubMaisView(){
   let html = `<h2 class="section-title">Configurações — Lubrificação</h2>`;
-  html += `<div class="card">
-    <div class="note">Configurações específicas do módulo de Lubrificação (frequências padrão, notificações de atraso, etc.) entram numa fase mais adiante do desenvolvimento.</div>
-  </div>`;
+  html += plCard(`<b>✅ 14 fases concluídas</b><div class="note" style="margin-top:6px">Dashboard, Equipamentos, Lubrificantes, Pontos, Procedimentos, Checklists, Planos, Rotas, Execução, Histórico e Indicadores — todos ligados entre si, sem cadastro duplicado.</div>`, 'var(--moss)');
+  html += plCard(`<b>🔭 Pronto para evoluir</b><div class="note" style="margin-top:6px">Ferramentas como biblioteca própria, migração de tela única para React/Vue, e API dedicada (Postgres/Node) continuam possíveis a partir daqui, sem precisar refazer o que já existe.</div>`);
+  html += `<div class="note">Configurações finas (frequências padrão, notificações de atraso) ficam para quando o uso real trouxer essas necessidades.</div>`;
   return html;
 }
 
