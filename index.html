@@ -1043,20 +1043,26 @@ function planoLubDashboardView(){
     html += plTable(['Tipo','Código','Nome'], linhas);
   }
 
+  const totalPontos = equipamentos.reduce((s,a)=>s+(a.pontosLubrificacao||[]).length,0);
   html += plSectionHeader('Equipamentos e Rotas');
   html += plMetricsRow([
     {valor:equipamentos.length, rotulo:'Equipamentos cadastrados'},
-    {valor:0, rotulo:'Pontos de lubrificação'},
-    {valor:0, rotulo:'Rotas cadastradas'},
+    {valor:totalPontos, rotulo:'Pontos de lubrificação'},
+    {valor:DB.rotas.filter(r=>r.ativo!==false).length, rotulo:'Rotas cadastradas'},
     {valor:equipCriticos.length, rotulo:'Equipamentos críticos', tone: equipCriticos.length>0?'danger':undefined}
   ]);
 
+  const hojeStr = new Date().toDateString();
+  const execucoesHoje = DB.historicoLub.filter(h=>h.status==='Concluída' && new Date(h.dataInicio).toDateString()===hojeStr).length;
+  const rotasComExec = new Set(DB.historicoLub.filter(h=>h.status==='Concluída').map(h=>h.rotaId));
+  const emAndamentoCount = DB.historicoLub.filter(h=>h.status==='Em andamento').length;
+  const rotasSemExec = DB.rotas.filter(r=>r.ativo!==false && !rotasComExec.has(r.id) && !DB.historicoLub.some(h=>h.rotaId===r.id && h.status==='Em andamento')).length;
   html += plSectionHeader('Execução');
   html += plMetricsRow([
-    {valor:0, rotulo:'Rotas executadas'},
-    {valor:0, rotulo:'Rotas pendentes', tone:'amber'},
-    {valor:0, rotulo:'Rotas atrasadas', tone:'danger'},
-    {valor:0, rotulo:'Lubrificações hoje', tone:'ok'}
+    {valor:DB.historicoLub.filter(h=>h.status==='Concluída').length, rotulo:'Rotas executadas', tone:'ok'},
+    {valor:rotasSemExec, rotulo:'Rotas pendentes', tone:'amber'},
+    {valor:emAndamentoCount, rotulo:'Em andamento'},
+    {valor:execucoesHoje, rotulo:'Lubrificações hoje', tone:'ok'}
   ]);
 
   html += plSectionHeader('Consumo do mês', plBadge(agora.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}),'neutral'));
