@@ -1100,6 +1100,7 @@ function attachPlanoLubDashboardEvents(){
 function planoLubModulosView(){
   if(planoLubSecaoAtiva==='equipamentos') return planoLubEquipamentosView();
   if(planoLubSecaoAtiva==='mapaPontos') return planoLubMapaPontosView();
+  if(planoLubSecaoAtiva==='pontos') return planoLubEquipamentosView();
   if(planoLubSecaoAtiva==='lubrificantes') return planoLubLubrificantesView();
   if(planoLubSecaoAtiva==='procedimentos') return planoLubProcedimentosView();
   if(planoLubSecaoAtiva==='checklists') return planoLubChecklistsView();
@@ -1121,7 +1122,7 @@ function planoLubModulosView(){
       <div class="row1" style="align-items:center">
         <div class="desc" style="font-size:15px;cursor:pointer" data-id="${s.id}">${s.icone} ${s.nome}</div>
         <div style="display:flex;align-items:center;gap:6px">
-          ${plBadge(['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'pronto':'em breve', ['equipamentos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'ok':'warn')}
+          ${plBadge(['equipamentos','pontos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'pronto':'em breve', ['equipamentos','pontos','lubrificantes','procedimentos','checklists','planos','rotas','execucao','historico','indicadores'].includes(s.id)?'ok':'warn')}
           ${plMenu('sec-'+s.id, [{acao:'abrir',texto:'Abrir seção'},{acao:'info',texto:'Sobre esta seção'}])}
         </div>
       </div>
@@ -1134,6 +1135,7 @@ function planoLubModulosView(){
 function attachPlanoLubModulosEvents(){
   if(planoLubSecaoAtiva==='equipamentos'){ attachPlanoLubEquipamentosEvents(); return; }
   if(planoLubSecaoAtiva==='mapaPontos'){ attachPlanoLubMapaPontosEvents(); return; }
+  if(planoLubSecaoAtiva==='pontos'){ attachPlanoLubEquipamentosEvents(); return; }
   if(planoLubSecaoAtiva==='lubrificantes'){ attachPlanoLubLubrificantesEvents(); return; }
   if(planoLubSecaoAtiva==='procedimentos'){ attachPlanoLubProcedimentosEvents(); return; }
   if(planoLubSecaoAtiva==='checklists'){ attachPlanoLubChecklistsEvents(); return; }
